@@ -49,9 +49,12 @@
           <button class="nav-link" data-view="together">Noi</button>
           <button class="nav-link" data-view="letter">Lettera</button>
         </nav>
-        <button id="logout-button" class="logout-button hidden" type="button">Esci</button>
-        <button id="music-toggle" class="music-toggle" aria-expanded="false" aria-controls="music-panel"><span class="music-note">♫</span><span>La nostra musica</span><span class="music-equalizer" aria-hidden="true"><i></i><i></i><i></i></span></button>
+        <div class="profile-wrap">
+          <button id="profile-toggle" class="profile-toggle" type="button" aria-label="Apri il menu profilo" aria-expanded="false" aria-controls="profile-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c.4-4 3.4-6.2 7.5-6.2s7.1 2.2 7.5 6.2"/></svg></button>
+          <section id="profile-panel" class="profile-panel hidden" aria-label="Profilo account"><div class="profile-avatar" id="profile-avatar" aria-hidden="true">♡</div><strong id="profile-name">Il nostro angolino</strong><span id="profile-email"></span><button id="logout-button" class="logout-button" type="button">Esci</button></section>
+        </div>
       </header>
+      <button id="music-toggle" class="music-toggle music-fab" type="button" aria-label="Apri la nostra musica" aria-expanded="false" aria-controls="music-panel"><span aria-hidden="true">♫</span></button>
       <section id="music-panel" class="music-panel hidden" aria-label="La nostra playlist">
         <div class="music-panel-copy"><span class="eyebrow">LA COLONNA SONORA DI NOI</span><strong>Le canzoni che ci somigliano.</strong><small id="music-status">Collega qui la playlist Spotify che avete creato insieme.</small><form id="playlist-form"><label for="playlist-url">Aggiungi un link Spotify</label><input id="playlist-url" type="url" placeholder="https://open.spotify.com/playlist/…"><button class="soft-button" type="submit">Aggiungi playlist</button><p id="playlist-feedback" aria-live="polite"></p></form><label for="playlist-history">Playlist salvate su questo dispositivo</label><select id="playlist-history"></select><button id="copy-playlist" class="soft-button" type="button">Copia link selezionato</button><button id="remove-playlist" class="soft-button" type="button">Rimuovi dalla cronologia</button></div>
         <div id="spotify-embed" class="spotify-embed"><div class="spotify-placeholder">♫<span>La nostra playlist apparirà qui</span></div></div>
@@ -119,8 +122,7 @@
             <img class="letter-sticker sticker-tommaso" src="assets/letter/tommaso-ubriaco.png" alt="Sticker di Smilla e Tommaso abbracciati">
             <button type="button" id="letter-close" class="letter-close" aria-label="Richiudi la lettera">×</button>
             <div class="letter-content"><p class="letter-kicker">PER TE, CON AMORE</p><h3>Una cosa che volevo dirti</h3>
-              <!-- Sostituisci il testo qui sotto con la tua lettera: resta tutto modificabile direttamente in index.html. -->
-              <div class="letter-body">
+              <div class="letter-body" id="letter-body">
                 <p>Ciao Smi! Se tutto è andato come ho pianificato stai leggendo questo dopo aver navigato il sito e visto un po' di roba, bene.</p>
                 <p>Volevo aggiungere due parole perché mi sembra la chiusura perfetta a ciò che hai visto e spero un giorno di rileggere ciò che sto scrivendo col sorriso, pensando a quando era tutto appena iniziato e tutto ciò che è venuto dopo.</p>
                 <p>Detto ciò, sai qual'è l'unica caratteristica che Dio invidia agli uomini? L'ignoranza.</p>
@@ -139,7 +141,7 @@
   </main>
   <button class="cat-friend hidden" id="cat-friend" aria-label="Fai uscire Macchia" title="Fai uscire Macchia"><img src="assets/coda-di-macchia.png?v=20261105-3" alt="Coda di Macchia"></button>
   <button type="button" id="cat-character" class="cat-character hidden" aria-label="Chiudi Macchia"><img src="assets/macchia-cartoon.png?v=20261105-3" alt="Macchia si affaccia con le zampe sul bordo dello schermo"></button>
-  <span id="cat-message" class="cat-message" role="status">Sono Macchia! Tommaso è il miglior fidanzato di sempre Smilla, sei troppo fortunata!!  ♡</span>
+  <button type="button" id="cat-message" class="cat-message" aria-label="Chiudi Macchia">Sono Macchia! Tommaso è il miglior fidanzato di sempre Smilla, sei troppo fortunata!!  ♡</button>
   <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Fotografia ingrandita"><button id="lightbox-close" class="lightbox-close" aria-label="Chiudi">×</button><button id="lightbox-prev" class="lightbox-arrow" aria-label="Foto precedente">‹</button><figure><img id="lightbox-image" src="" alt=""><figcaption id="lightbox-caption"></figcaption></figure><button id="lightbox-next" class="lightbox-arrow" aria-label="Foto successiva">›</button></div>
   <audio id="background-music" loop></audio>
   <script type="module" src="/script.js"></script>

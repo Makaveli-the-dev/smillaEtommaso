@@ -5,6 +5,7 @@ import { getAuthErrorMessage, logAuthDiagnostic, requireAlbumMember, signInAlbum
 import { deleteAlbumPhoto, getAlbumAccessMessage, loadAlbumPhotos, refreshAlbumPhotoUrl, uploadAlbumPhoto } from "./src/supabase-album.js";
 
 const SITE_PASSWORD = "orsa"; // Protezione dimostrativa: non è autenticazione reale.
+const LETTER_PASSWORD = "lettera"; // Sostituisci qui il segnaposto con la parola scelta da te.
 const START_DATE = new Date(2026, 10, 1, 0, 0, 0);
 // Incolla qui il link della playlist Spotify: lo collegheremo appena mi mandi il link.
 const SPOTIFY_PLAYLIST_URL = "https://open.spotify.com/playlist/37i9dQZF1EJCslRrsK5s1E";
@@ -35,6 +36,7 @@ passwordForm.addEventListener("submit", (event) => {
 
 function showLoginScreen(message = "") {
   siteAuthenticated = false; authEpoch += 1;
+  lockLetter();
   site.classList.add("hidden"); lockScreen.classList.remove("hidden");
   authChecking.classList.add("hidden"); logoutButton.classList.add("hidden");
   supabasePhotos = []; buildPages();
@@ -57,6 +59,7 @@ async function enterAuthenticatedSite() {
   buildPages();
   showView("home");
   await refreshRemoteAlbum();
+  await refreshProfile();
 }
 
 authForm.addEventListener("submit", async (event) => {
@@ -79,10 +82,31 @@ logoutButton.addEventListener("click", async () => {
   logoutButton.disabled = true;
   try {
     await signOutAlbumMember();
-    showLoginScreen("Hai effettuato la disconnessione.♡");
+    showLoginScreen();
   } catch (error) {
-    $("supabase-status").textContent = getAlbumAccessMessage(error);
+    $("supabase-status").textContent = getAlbumAccessMessage(error); $("supabase-status").classList.remove("hidden");
   } finally { logoutButton.disabled = false; }
+});
+
+async function refreshProfile() {
+  const user = (await supabase?.auth.getUser())?.data?.user;
+  if (!user) return;
+  $("profile-email").textContent = user.email || "";
+  try {
+    const { data } = await supabase.from("album_members").select("display_name").eq("user_id", user.id).maybeSingle();
+    $("profile-name").textContent = data?.display_name || "Il nostro angolino";
+  } catch { $("profile-name").textContent = "Il nostro angolino"; }
+}
+const profileToggle = $("profile-toggle"), profilePanel = $("profile-panel");
+profileToggle.addEventListener("click", () => {
+  const opening = profilePanel.classList.contains("hidden");
+  profilePanel.classList.toggle("hidden", !opening); profileToggle.setAttribute("aria-expanded", String(opening));
+});
+document.addEventListener("click", event => {
+  if (!event.target.closest(".profile-wrap")) { profilePanel.classList.add("hidden"); profileToggle.setAttribute("aria-expanded", "false"); }
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") { profilePanel.classList.add("hidden"); profileToggle.setAttribute("aria-expanded", "false"); }
 });
 
 async function initializeAuthentication() {
@@ -139,8 +163,22 @@ function closeLetter() {
   if (!scene || !toggle || !paper) return;
   scene.classList.remove("letter-open"); toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-label", "Apri la lettera"); paper.setAttribute("aria-hidden", "true"); paper.inert = true;
 }
+let letterUnlocked = false;
+function lockLetter() {
+  letterUnlocked = false;
+  closeLetter();
+}
 $("letter-toggle").addEventListener("click", () => {
   const scene = $("letter-scene"), toggle = $("letter-toggle"), paper = $("letter-paper");
+  if (!letterUnlocked) {
+    const answer = window.prompt("Inserisci la parola d'ordine per aprire la lettera:");
+    if (answer === null) return;
+    if (answer !== LETTER_PASSWORD) {
+      window.alert("La parola d'ordine non è corretta. Riprova.");
+      return;
+    }
+    letterUnlocked = true;
+  }
   const opening = !scene.classList.contains("letter-open");
   scene.classList.toggle("letter-open", opening); toggle.setAttribute("aria-expanded", String(opening)); toggle.setAttribute("aria-label", opening ? "Richiudi la lettera" : "Apri la lettera"); paper.setAttribute("aria-hidden", String(!opening)); paper.inert = !opening;
 });
@@ -151,7 +189,6 @@ const musicPanel = $("music-panel"), musicButton = $("music-toggle");
 musicButton.addEventListener("click", () => {
   const opening = musicPanel.classList.contains("hidden");
   musicPanel.classList.toggle("hidden", !opening); musicButton.setAttribute("aria-expanded", String(opening));
-  if (opening) musicPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 });
 function spotifyEmbedUrl(value) {
   if (!value) return "";
@@ -309,7 +346,7 @@ $("add-photo-form").addEventListener("submit", async event => {
       }
     }
     buildPages(); currentPage = albumPages.findIndex(page => page.items.some(item => added.some(photo => photo.id === item.id))); renderAlbum();
-    $("upload-status").textContent = supabaseConfigured ? `${added.length} ${added.length === 1 ? "foto caricata" : "foto caricate"} nel bucket privato.` : `${added.length} ${added.length === 1 ? "foto salvata" : "foto salvate"} su questo dispositivo.`;
+    $("upload-status").textContent = "";
     $("add-photo-form").reset(); selectedFiles = []; renderPhotoPreview();
   } catch (error) {
     console.error(error);
@@ -325,7 +362,7 @@ async function removeAlbumPhoto(photo) {
     } else {
       await deleteUploadedPhoto(photo.id);
     }
-    buildPages(); $("upload-status").textContent = "Foto rimossa dall'album.";
+    buildPages(); $("upload-status").textContent = "";
   } catch (error) { $("upload-status").textContent = getAlbumAccessMessage(error); }
 }
 
@@ -359,6 +396,7 @@ updateCounter(); setInterval(updateCounter,1000);
 $("secret-button").addEventListener("click", () => $("secret-message").classList.toggle("hidden"));
 function closeCat() {
   const tail = $("cat-friend"), cat = $("cat-character");
+  $("cat-message")?.classList.remove("cat-touch-visible");
   cat?.classList.remove("cat-entering", "cat-exiting"); cat?.classList.add("hidden");
   if (tail?._catReveal) tail.removeEventListener("transitionend", tail._catReveal);
   if (tail) { tail._catReveal = null; tail.classList.remove("tail-leaving"); tail.classList.add("hidden"); void tail.offsetWidth; tail.classList.remove("hidden"); }
@@ -374,7 +412,7 @@ $("cat-friend").addEventListener("click", () => {
     tail._catReveal = null;
     if (!tail.classList.contains("tail-leaving")) return;
     tail.classList.add("hidden"); cat.classList.remove("hidden");
-    $("cat-message").classList.remove("hidden");
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) $("cat-message").classList.add("cat-touch-visible");
     requestAnimationFrame(() => { cat.classList.add("cat-entering"); cat.focus(); });
   };
   tail.addEventListener("transitionend", tail._catReveal);
@@ -387,21 +425,23 @@ $("cat-character").addEventListener("click", () => {
     if (event.propertyName !== "transform") return;
     cat.removeEventListener("transitionend", restoreTail);
     cat.classList.remove("cat-exiting"); cat.classList.add("hidden");
+    $("cat-message").classList.remove("cat-touch-visible");
     tail.classList.remove("hidden");
     void tail.offsetWidth;
     tail.classList.remove("tail-leaving");
   });
 });
+$("cat-message").addEventListener("click", () => $("cat-character").click());
 async function refreshRemoteAlbum() {
   const status = $("supabase-status"), note = $("upload-note");
   if (!supabaseConfigured) {
-    status.textContent = "Supabase non configurato: l'album attuale continua a salvare le foto solo su questo dispositivo.";
-    note.textContent = "Le foto aggiunte qui restano in questo browser e su questo dispositivo finché non configuri Supabase.";
+    status.textContent = ""; status.classList.add("hidden");
+    note.textContent = "Le foto aggiunte qui vengono salvate solo in questo browser e su questo dispositivo.";
     return;
   }
   const requestEpoch = authEpoch;
-  status.textContent = "Verifico l'accesso all'album privato…";
-  note.textContent = "Le foto online vengono ottimizzate e caricate nel bucket privato album. L'accesso remoto richiede una sessione autorizzata.";
+  status.textContent = ""; status.classList.add("hidden");
+  note.textContent = "Le foto aggiunte all'album sono condivise tra i due account autorizzati.";
   try {
     const remotePhotos = await loadAlbumPhotos();
     if (!siteAuthenticated || requestEpoch !== authEpoch) return;
@@ -411,9 +451,7 @@ async function refreshRemoteAlbum() {
       const replacement = supabasePhotos.find(photo => photo.id === lightboxPhotos[currentLightbox].id);
       if (replacement) { lightboxPhotos[currentLightbox] = replacement; updateLightbox(); }
     }
-    status.textContent = supabasePhotos.length
-      ? "Album privato aggiornato. Le immagini usano collegamenti temporanei rinnovati durante la consultazione."
-      : "Accesso Supabase autorizzato. L'album online non contiene ancora fotografie.";
+    status.textContent = "";
   } catch (error) {
     if (!siteAuthenticated || requestEpoch !== authEpoch) return;
     if (["auth_required", "not_authorized", "membership_unavailable", "session_error"].includes(error?.code)) {
@@ -425,7 +463,7 @@ async function refreshRemoteAlbum() {
         : getAlbumAccessMessage(error));
       return;
     }
-    status.textContent = getAlbumAccessMessage(error);
+    status.textContent = getAlbumAccessMessage(error); status.classList.remove("hidden");
   }
 }
 

@@ -90,3 +90,7 @@ Le policy RLS restano l'autorità effettiva: nascondere l'interfaccia o non cono
 ## 7. Cosa resta locale
 
 La playlist Spotify continua a usare la cronologia locale del browser; l'API per le playlist condivise è preparata, ma la relativa interfaccia condivisa non fa parte di questo intervento. Le foto già salvate in IndexedDB restano sul dispositivo e non vengono migrate automaticamente. Il contatore, i testi e le altre sezioni non sono stati modificati.
+
+## 8. Menu profilo e fotografia
+
+Il menu mostra il nome da `album_members` e l'email della sessione Auth. Lo schema e le policy esistenti non distinguono i permessi di caricamento tra Tommaso e Smilla: entrambi i membri possono già inserire ed eliminare oggetti nel bucket `album`. Per questo il menu usa l'icona predefinita e non offre un caricamento avatar che sembrerebbe limitato all'amministratore senza esserlo davvero. Per aggiungere avatar personalizzati con permessi differenziati serve un'autorizzazione server-side o una policy dedicata, interventi esclusi da questa fase.
