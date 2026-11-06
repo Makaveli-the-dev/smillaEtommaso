@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f8e8ef">
+  <meta name="description" content="Il piccolo universo di Smilla e Tommaso.">
+  <title>smillaetommaso ♡</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&family=Caveat:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="stars" aria-hidden="true"><span>✦</span><span>✧</span><span>·</span><span>✦</span><span>✧</span><span>·</span></div>
+  <main>
+    <section id="lock-screen" class="lock-screen">
+      <div class="lock-card">
+        <div class="tiny-orbit">✧</div>
+        <p class="eyebrow">IL NOSTRO ANGOLINO PERSONALE 🫰</p>
+        <h1>smilla<span>&</span>tommaso</h1>
+        <p class="lock-subtitle">Perché anche se non sono con te,<br>Questa parte di me lo è.</p>
+        <form id="unlock-form">
+          <label class="sr-only" for="password-input">La nostra password</label>
+          <input id="password-input" type="password" placeholder="Indizio: ci siamo conosciouti all'…" autocomplete="current-password" required>
+          <button class="primary-button" type="submit">Entra nel nostro mondo <span>♡</span></button>
+          <p id="password-message" class="form-message" aria-live="polite"></p>
+        </form>
+        <p class="lock-footnote">(Altro che il cuore di Enea...qualità!)</p>
+      </div>
+    </section>
+
+    <section id="site" class="site hidden">
+      <header class="topbar">
+        <a class="wordmark" href="#home" data-view="home">s<span>&</span>t<span class="wordmark-heart">♡</span></a>
+        <nav aria-label="Navigazione principale">
+          <button class="nav-link active" data-view="home">Inizio</button>
+          <button class="nav-link" data-view="memories">Album</button>
+          <button class="nav-link" data-view="together">Noi</button>
+          <button class="nav-link" data-view="letter">Lettera</button>
+        </nav>
+        <button id="music-toggle" class="music-toggle" aria-expanded="false" aria-controls="music-panel"><span class="music-note">♫</span><span>La nostra musica</span><span class="music-equalizer" aria-hidden="true"><i></i><i></i><i></i></span></button>
+      </header>
+      <section id="music-panel" class="music-panel hidden" aria-label="La nostra playlist">
+        <div class="music-panel-copy"><span class="eyebrow">LA COLONNA SONORA DI NOI</span><strong>Le canzoni che ci somigliano.</strong><small id="music-status">Collega qui la playlist Spotify che avete creato insieme.</small><form id="playlist-form"><label for="playlist-url">Aggiungi un link Spotify</label><input id="playlist-url" type="url" placeholder="https://open.spotify.com/playlist/…"><button class="soft-button" type="submit">Aggiungi playlist</button><p id="playlist-feedback" aria-live="polite"></p></form><label for="playlist-history">Playlist salvate su questo dispositivo</label><select id="playlist-history"></select><button id="copy-playlist" class="soft-button" type="button">Copia link selezionato</button><button id="remove-playlist" class="soft-button" type="button">Rimuovi dalla cronologia</button></div>
+        <div id="spotify-embed" class="spotify-embed"><div class="spotify-placeholder">♫<span>La nostra playlist apparirà qui</span></div></div>
+      </section>
+
+      <section id="home-view" class="view">
+        <div class="hero">
+          <p class="eyebrow">DAL 1 NOVEMBRE 2026 · LA COPPIA CON PIÙ AURA</p>
+          <div class="hero-sparkle sparkle-one">✧</div><div class="hero-sparkle sparkle-two">✦</div>
+          <h2>Benvenuta nel nostro<br><em>universo.</em></h2>
+          <p class="hero-copy">Una raccolta del nostro tempo insieme, <br>per non permetterti di dimenticarlo, mai. 🙄</p>
+          <button class="primary-button hero-button" data-view="memories">Sfoglia il nostro album <span>↗</span></button>
+          <div class="hero-bottom-note">RESTA ANCORA UN PO' ♡</div>
+        </div>
+        <div class="home-lower"><div class="section-intro"><p class="eyebrow">UNA PICCOLA CERTEZZA</p><h3>La vita è fatta<br>di <em>piccole cose.</em></h3></div><div class="mini-note"><span class="note-star">✳</span><p>E in qualche modo,<br>ogni cosa è più bella con te.</p><span class="note-signature">— probabilmente noi</span></div></div>
+      </section>
+
+      <section id="memories-view" class="view hidden">
+        <div class="page-heading"><p class="eyebrow">I NOSTRI RICORDI ASSIEME, PAGINA PER PAGINA</p><h2>il nostro <em>album.</em></h2><p>Siamo più di queste foto, ma sono pur sempre pezzi di noi, pezzi che tengo nel cuore. </p></div>
+        <div class="album-toolbar">
+          <label for="period-index">Vai a un periodo</label>
+          <select id="period-index"><option value="">Scegli un mese…</option></select>
+          <button id="add-photo-toggle" class="soft-button">＋ Aggiungi una foto</button>
+        </div>
+        <form id="add-photo-form" class="add-photo-form hidden">
+          <div class="form-heading"><div><span class="eyebrow">UN NUOVO RICORDO</span><h3>Aggiungi una pagina</h3></div><button type="button" id="close-add-photo" class="icon-button" aria-label="Chiudi">×</button></div>
+          <div class="upload-fields">
+            <label>Quando è stata scattata?<input id="photo-date" type="date" required></label>
+            <label>Quale foto vuoi aggiungere?<input id="photo-file" type="file" accept="image/*" required></label>
+            <label class="wide-field">Un piccolo dettaglio (facoltativo)<input id="photo-caption" type="text" maxlength="90" placeholder="Una frase, un posto, una cosa buffa…"></label>
+          </div>
+          <p class="upload-note">Le foto aggiunte da qui vengono salvate solo in questo browser e su questo dispositivo.</p>
+          <button class="primary-button" type="submit">Aggiungi al nostro album ♡</button>
+          <p id="upload-status" class="form-message" aria-live="polite"></p>
+        </form>
+        <div class="album-stage">
+          <button id="album-prev" class="page-arrow" aria-label="Pagina precedente">‹</button>
+          <article id="album-page" class="album-page" aria-live="polite">
+            <div class="page-topline"><span>SMILLA & TOMMASO</span><span class="page-heart">♡</span></div>
+            <div id="page-content" class="page-content"></div>
+            <div class="page-bottomline"><span id="page-date-label">I NOSTRI RICORDI</span><span id="page-number">—</span></div>
+          </article>
+          <button id="album-next" class="page-arrow" aria-label="Pagina successiva">›</button>
+        </div>
+        <div class="album-controls"><span id="album-position">Nessun ricordo ancora</span><div class="page-dots" id="page-dots"></div></div>
+        <p class="album-empty-note" id="album-empty-note">Il nostro album aspetta di essere riempito. Puoi aggiungerle con il pulsante qui sopra. ♡</p>
+      </section>
+
+      <section id="together-view" class="view hidden">
+        <div class="counter-wrap"><p class="eyebrow">VISTO CHE HAI LA MEMORIA CORTA...</p><h2>Da quanto<br>siamo <em>noi?</em></h2>
+          <div class="counter-card"><div class="days-number" id="days">0</div><div class="days-label">GIORNI INSIEME</div><div class="time-grid"><div><strong id="hours">00</strong><span>ore</span></div><div><strong id="minutes">00</strong><span>minuti</span></div><div><strong id="seconds">00</strong><span>secondi</span></div></div><p class="counter-footer">And still counting... ♡</p></div>
+          <div class="secret-area"><button id="secret-button" class="text-button">psst… c'è una cosa qui <span>✧</span></button><p id="secret-message" class="secret-message hidden">Hai trovato il mio promemoria: sei la mia persona preferita. ♡</p></div>
+        </div>
+      </section>
+      <section id="letter-view" class="view hidden">
+        <div class="page-heading"><p class="eyebrow">UN PICCOLO SEGRETO PER TE</p><h2>Una <em>lettera.</em></h2><p>Una busta, un pensiero e un momento tutto tuo.</p></div>
+        <div class="letter-scene" id="letter-scene">
+          <button type="button" class="letter-envelope" id="letter-toggle" aria-expanded="false" aria-controls="letter-paper" aria-label="Apri la lettera">
+            <span class="envelope-back"></span><span class="envelope-letter-peek" aria-hidden="true"></span><span class="envelope-flap"></span><span class="envelope-pocket"></span><span class="envelope-seal" aria-hidden="true">♡</span><span class="envelope-prompt">Apri la lettera</span>
+          </button>
+          <article class="letter-paper" id="letter-paper" aria-hidden="true" inert>
+            <img class="letter-sticker sticker-smilla" src="assets/letter/smilla-arrabbiata.png" alt="Sticker di Smilla arrabbiata e Tommaso in fuga">
+            <img class="letter-sticker sticker-tommaso" src="assets/letter/tommaso-ubriaco.png" alt="Sticker di Smilla e Tommaso abbracciati">
+            <button type="button" id="letter-close" class="letter-close" aria-label="Richiudi la lettera">×</button>
+            <div class="letter-content"><p class="letter-kicker">PER TE, CON AMORE</p><h3>Una cosa che volevo dirti</h3>
+              <!-- Sostituisci il testo qui sotto con la tua lettera: resta tutto modificabile direttamente in index.html. -->
+              <div class="letter-body">
+                <p>Ciao Smi! Se tutto è andato come ho pianificato stai leggendo questo dopo aver navigato il sito e visto un po' di roba, bene.</p>
+                <p>Volevo aggiungere due parole perché mi sembra la chiusura perfetta a ciò che hai visto e spero un giorno di rileggere ciò che sto scrivendo col sorriso, pensando a quando era tutto appena iniziato e tutto ciò che è venuto dopo.</p>
+                <p>Detto ciò, sai qual'è l'unica caratteristica che Dio invidia agli uomini? L'ignoranza.</p>
+                <p>Prima di iniziare con "Di cosa sta parlando?" fammi spiegare bene: il non sapere è il nostro privilegio, ciò che ci permette di vivere ogni momento con la leggerezza che solo una mente libera dalle catene dei pensieri può provare, d'altronde come dicono gli inglesi "Ignorance is bliss".</p>
+                <p>Ebbene io in questo momento non so cosa diventeremo, cosa faremo o cosa vogliamo, anzi, a malapena so che cosa siamo, ma so che non conta nulla.</p>
+                <p>Perché ciò che veramente conta è quello che provo quando ti vedo, quando ti stringo, quando ti bacio, quando ti prendo in giro, quando vedo una tua notifica sul telefono, quando, quando, quando...insomma, quello che mi fai provare. Se potessi rispondere a tutte le domande, non potrei godermi questi momenti, ed è per questo che non li scambierei con nulla, perché non si è vivi se non ci si sente vivi e credimi, Smi, nulla mi fa sentire più vivo di poterti guardare negli occhi.</p>
+              </div>
+              <p class="letter-signature">Tuo, Babbaggi ❤️</p>
+              <p class="letter-date">5 novembre 2026</p>
+            </div>
+          </article>
+        </div>
+      </section>
+      <footer class="footer"><span>Fatto con amore (e un po' di AI)</span><span>Smilla <b>♡</b> Tommaso</span><span>© 2026</span></footer>
+    </section>
+  </main>
+  <button class="cat-friend hidden" id="cat-friend" aria-label="Fai uscire Macchia" title="Fai uscire Macchia"><img src="assets/coda-di-macchia.png?v=20261105-3" alt="Coda di Macchia"></button>
+  <button type="button" id="cat-character" class="cat-character hidden" aria-label="Chiudi Macchia"><img src="assets/macchia-cartoon.png?v=20261105-3" alt="Macchia si affaccia con le zampe sul bordo dello schermo"></button>
+  <span id="cat-message" class="cat-message" role="status">Sono Macchia! Tommaso è il miglior fidanzato di sempre Smilla, sei troppo fortunata!!  ♡</span>
+  <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Fotografia ingrandita"><button id="lightbox-close" class="lightbox-close" aria-label="Chiudi">×</button><button id="lightbox-prev" class="lightbox-arrow" aria-label="Foto precedente">‹</button><figure><img id="lightbox-image" src="" alt=""><figcaption id="lightbox-caption"></figcaption></figure><button id="lightbox-next" class="lightbox-arrow" aria-label="Foto successiva">›</button></div>
+  <audio id="background-music" loop></audio>
+  <script src="script.js"></script>
+</body>
+</html>
