@@ -1,7 +1,7 @@
 // ================================
 /* smillaetommaso — impostazioni */
 // ================================
-import { getAuthErrorMessage, requireAlbumMember, signInAlbumMember, signOutAlbumMember, supabase, supabaseConfigured } from "./src/supabase-client.js";
+import { getAuthErrorMessage, logAuthDiagnostic, requireAlbumMember, signInAlbumMember, signOutAlbumMember, supabase, supabaseConfigured } from "./src/supabase-client.js";
 import { deleteAlbumPhoto, getAlbumAccessMessage, loadAlbumPhotos, refreshAlbumPhotoUrl, uploadAlbumPhoto } from "./src/supabase-album.js";
 
 const SITE_PASSWORD = "orsa"; // Protezione dimostrativa: non è autenticazione reale.
@@ -92,18 +92,22 @@ async function initializeAuthentication() {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
     if (!data.session) {
+      console.info("[Supabase Auth diagnostica]", { stage: "session_restore", category: "no_session" });
       showLoginScreen("Accedi con l'account privato autorizzato per continuare.");
       return;
     }
+    console.info("[Supabase Auth diagnostica]", { stage: "session_restore", category: "session_present" });
     try {
       await requireAlbumMember();
+      console.info("[Supabase Auth diagnostica]", { stage: "membership_check", category: "authorized_member" });
     } catch (membershipError) {
-      await signOutAlbumMember();
+      try { await signOutAlbumMember(); } catch (signOutError) { logAuthDiagnostic("sign_out", signOutError); }
       showLoginScreen(membershipError.message || "Questo account non è autorizzato a usare l'album privato.");
       return;
     }
     await enterAuthenticatedSite();
   } catch (error) {
+    logAuthDiagnostic("session_restore", error);
     showLoginScreen(getAuthErrorMessage(error));
   }
 }
