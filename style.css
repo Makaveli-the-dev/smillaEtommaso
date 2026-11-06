@@ -208,6 +208,17 @@ em { color: var(--pink-strong); font-weight: 500; }
 .music-panel-copy { min-width:0; }
 @media(max-width:700px) { .page-content { min-height:300px; } .page-content.page-count-3 { grid-template-columns:1fr 1fr; } .page-content.page-count-3 .album-photo:last-child { grid-column:1/-1 !important; width:min(70%,260px) !important; justify-self:center; } .footer { gap:6px; font-size:9px; } }
 
+.auth-form { display:grid; gap:10px; text-align:left; }
+.auth-form label { margin-top:4px; color:var(--muted); font-size:11px; }
+.auth-form input { width:100%; border:1px solid #edd1dd; border-radius:999px; padding:14px 17px; outline:none; background:rgba(255,255,255,.8); color:var(--plum); }
+.auth-form input:focus { border-color:var(--pink-strong); box-shadow:0 0 0 3px rgba(189,113,143,.12); }
+.auth-form .primary-button { margin-top:6px; }
+.auth-form .form-message,.auth-checking { min-height:20px; margin:4px 0 0; text-align:center; line-height:1.5; }
+.primary-button:disabled,.logout-button:disabled { cursor:wait; opacity:.7; }
+.logout-button { border:1px solid rgba(189,113,143,.28); border-radius:99px; padding:7px 11px; background:rgba(255,250,253,.58); color:var(--muted); font-size:11px; transition:background .2s,color .2s; }
+.logout-button:hover { background:#fffafd; color:var(--pink-strong); }
+@media(max-width:700px) { .logout-button { padding:7px 8px; font-size:10px; }.topbar nav { gap:7px; } }
+
 .page-content .album-photo { cursor:default; }
 
 /* Gatto ancorato alla finestra, fuori dai contenitori animati della home. */

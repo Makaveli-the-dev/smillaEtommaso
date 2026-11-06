@@ -1,7 +1,7 @@
 // ================================
 /* smillaetommaso — impostazioni */
 // ================================
-import { supabaseConfigured } from "./src/supabase-client.js";
+import { getAuthErrorMessage, requireAlbumMember, signInAlbumMember, signOutAlbumMember, supabase, supabaseConfigured } from "./src/supabase-client.js";
 import { deleteAlbumPhoto, getAlbumAccessMessage, loadAlbumPhotos, refreshAlbumPhotoUrl, uploadAlbumPhoto } from "./src/supabase-album.js";
 
 const SITE_PASSWORD = "orsa"; // Protezione dimostrativa: non è autenticazione reale.
@@ -15,8 +15,16 @@ const photos = [
 
 const $ = (id) => document.getElementById(id);
 const lockScreen = $("lock-screen"), site = $("site"), passwordForm = $("unlock-form");
+const authForm = $("auth-form"), authChecking = $("auth-checking"), logoutButton = $("logout-button");
+let siteAuthenticated = false, authEpoch = 0;
+if (supabaseConfigured) {
+  passwordForm.classList.add("hidden"); authChecking.classList.remove("hidden");
+} else {
+  passwordForm.classList.remove("hidden"); authChecking.classList.add("hidden");
+}
 passwordForm.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (supabaseConfigured) return;
   if ($("password-input").value === SITE_PASSWORD) {
     lockScreen.classList.add("hidden"); site.classList.remove("hidden"); showView("home");
   } else {
@@ -25,7 +33,92 @@ passwordForm.addEventListener("submit", (event) => {
   }
 });
 
+function showLoginScreen(message = "") {
+  siteAuthenticated = false; authEpoch += 1;
+  site.classList.add("hidden"); lockScreen.classList.remove("hidden");
+  authChecking.classList.add("hidden"); logoutButton.classList.add("hidden");
+  supabasePhotos = []; buildPages();
+  closeCat();
+  lightboxPhotos = []; currentLightbox = 0;
+  $("lightbox").classList.add("hidden"); $("lightbox-image").removeAttribute("src");
+  if (supabaseConfigured) {
+    passwordForm.classList.add("hidden"); authForm.classList.remove("hidden");
+    $("auth-password").value = "";
+    $("auth-message").textContent = message;
+  } else {
+    authForm.classList.add("hidden"); passwordForm.classList.remove("hidden");
+  }
+}
+
+async function enterAuthenticatedSite() {
+  siteAuthenticated = true; authEpoch += 1;
+  lockScreen.classList.add("hidden"); site.classList.remove("hidden"); logoutButton.classList.remove("hidden");
+  await readUploadedPhotos();
+  buildPages();
+  showView("home");
+  await refreshRemoteAlbum();
+}
+
+authForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!supabaseConfigured) return;
+  const button = $("auth-submit"), feedback = $("auth-message");
+  button.disabled = true; button.textContent = "Accesso in corso…"; feedback.textContent = "";
+  try {
+    await signInAlbumMember($("auth-email").value, $("auth-password").value);
+    $("auth-password").value = "";
+    await enterAuthenticatedSite();
+  } catch (error) {
+    feedback.textContent = error?.code ? error.message : getAuthErrorMessage(error);
+  } finally {
+    button.disabled = false; button.innerHTML = "Accedi al nostro mondo <span>♡</span>";
+  }
+});
+
+logoutButton.addEventListener("click", async () => {
+  logoutButton.disabled = true;
+  try {
+    await signOutAlbumMember();
+    showLoginScreen("Hai effettuato la disconnessione.♡");
+  } catch (error) {
+    $("supabase-status").textContent = getAlbumAccessMessage(error);
+  } finally { logoutButton.disabled = false; }
+});
+
+async function initializeAuthentication() {
+  if (!supabaseConfigured) return;
+  passwordForm.classList.add("hidden"); authForm.classList.add("hidden"); authChecking.classList.remove("hidden");
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    if (!data.session) {
+      showLoginScreen("Accedi con l'account privato autorizzato per continuare.");
+      return;
+    }
+    try {
+      await requireAlbumMember();
+    } catch (membershipError) {
+      await signOutAlbumMember();
+      showLoginScreen(membershipError.message || "Questo account non è autorizzato a usare l'album privato.");
+      return;
+    }
+    await enterAuthenticatedSite();
+  } catch (error) {
+    showLoginScreen(getAuthErrorMessage(error));
+  }
+}
+
+if (supabaseConfigured) {
+  supabase.auth.onAuthStateChange((event) => {
+    if (event === "SIGNED_OUT" && siteAuthenticated) showLoginScreen("La sessione è terminata. Accedi di nuovo per continuare.");
+  });
+}
+
 function showView(name) {
+  if (name === "memories" && supabaseConfigured && !siteAuthenticated) {
+    showLoginScreen("Accedi con l'account privato autorizzato per aprire l'album.");
+    return;
+  }
   closeCat();
   if (name !== "letter") closeLetter();
   document.querySelectorAll(".view").forEach(view => view.classList.add("hidden"));
@@ -302,10 +395,13 @@ async function refreshRemoteAlbum() {
     note.textContent = "Le foto aggiunte qui restano in questo browser e su questo dispositivo finché non configuri Supabase.";
     return;
   }
+  const requestEpoch = authEpoch;
   status.textContent = "Verifico l'accesso all'album privato…";
   note.textContent = "Le foto online vengono ottimizzate e caricate nel bucket privato album. L'accesso remoto richiede una sessione autorizzata.";
   try {
-    supabasePhotos = await loadAlbumPhotos();
+    const remotePhotos = await loadAlbumPhotos();
+    if (!siteAuthenticated || requestEpoch !== authEpoch) return;
+    supabasePhotos = remotePhotos;
     buildPages();
     if (!$("lightbox").classList.contains("hidden") && lightboxPhotos[currentLightbox]?.source === "supabase") {
       const replacement = supabasePhotos.find(photo => photo.id === lightboxPhotos[currentLightbox].id);
@@ -315,14 +411,25 @@ async function refreshRemoteAlbum() {
       ? "Album privato aggiornato. Le immagini usano collegamenti temporanei rinnovati durante la consultazione."
       : "Accesso Supabase autorizzato. L'album online non contiene ancora fotografie.";
   } catch (error) {
-    if (error?.code === "auth_required") supabasePhotos = [];
-    if (error?.code === "not_authorized") supabasePhotos = [];
-    if (error?.code === "auth_required" || error?.code === "not_authorized") buildPages();
+    if (!siteAuthenticated || requestEpoch !== authEpoch) return;
+    if (["auth_required", "not_authorized", "membership_unavailable", "session_error"].includes(error?.code)) {
+      supabasePhotos = [];
+      buildPages();
+      try { await signOutAlbumMember(); } catch { /* L'album resta comunque chiuso localmente. */ }
+      showLoginScreen(error.code === "auth_required"
+        ? "La sessione è terminata. Accedi di nuovo per aprire l'album privato."
+        : getAlbumAccessMessage(error));
+      return;
+    }
     status.textContent = getAlbumAccessMessage(error);
   }
 }
 
-readUploadedPhotos().then(async () => { buildPages(); await refreshRemoteAlbum(); });
+readUploadedPhotos().then(async () => {
+  buildPages();
+  if (supabaseConfigured) await initializeAuthentication();
+  else await refreshRemoteAlbum();
+});
 setInterval(() => {
   if (supabaseConfigured && !$("memories-view").classList.contains("hidden") && document.visibilityState === "visible") refreshRemoteAlbum();
 }, 240_000);

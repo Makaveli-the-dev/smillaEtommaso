@@ -1,103 +1,92 @@
-# Guida di configurazione — fase iniziale Supabase
+# Configurazione Supabase Auth — Smilla & Tommaso
 
-Il sito resta vanilla HTML, CSS e JavaScript, con Vite solo per costruire il frontend e includere `@supabase/supabase-js`. La migrazione prepara il database e il bucket `album` privato. **In questa fase non viene aggiunto login, registrazione, gestione account o alcuna autenticazione nel sito.**
+Il sito usa Supabase Auth per l'accesso email/password e consente di entrare solo agli account che si trovano in `public.album_members`. Non esiste una schermata di registrazione. La lettura, il caricamento e l'eliminazione delle foto continuano a essere protetti dalle policy RLS già presenti e dal bucket privato `album`.
 
-Le foto online private non sono ancora consultabili, caricabili o cancellabili dal sito finché non verrà realizzata l'autenticazione nella fase successiva. Supabase richiede una sessione autorizzata per leggere un bucket privato; il codice non aggira questo requisito e non crea URL pubblici. Le operazioni previste nel client verificano la sessione e l'appartenenza all'elenco `album_members` prima di procedere.
+## 1. Configura Auth dalla dashboard
 
-## 1. Valori pubblici del progetto Supabase
+Questi passaggi sono manuali: il repository non modifica la dashboard Supabase.
 
-1. Apri il progetto Supabase già creato.
-2. In **Project Settings → API** copia il **Project URL** e una **Publishable key**. Se nel progetto è ancora mostrata la vecchia chiave `anon`, può essere usata al posto della publishable key.
-3. Nella cartella del sito crea il file locale `.env` copiando `.env.example`:
+1. Apri **Authentication → Providers** e verifica che **Email** sia abilitato.
+2. In **Authentication → Settings** disattiva **Allow new users to sign up**. Supabase documenta che, disattivando questa opzione, possono accedere solo gli utenti già esistenti ([configurazione Auth](https://supabase.com/docs/guides/auth/general-configuration)).
+3. In **Authentication → Users**, crea manualmente i due utenti e assegna loro password personali. Non usare mai la stessa password per entrambi. Se l'interfaccia propone un invito, completalo e verifica l'email se richiesto.
+4. Copia l'UUID di ciascun utente dalla pagina Users: servirà per autorizzare solo Tommaso e Smilla.
+
+## 2. Autorizza i due account in `album_members`
+
+La migrazione esistente ha già creato la tabella e non permette ai client di modificarla. Nel **SQL Editor** esegui una query per ciascun utente, sostituendo il segnaposto con l'UUID reale mostrato nella dashboard:
+
+```sql
+insert into public.album_members (user_id, display_name)
+values ('<UUID_REALE_TOMMASO>', 'Tommaso')
+on conflict (user_id) do update set display_name = excluded.display_name;
+
+insert into public.album_members (user_id, display_name)
+values ('<UUID_REALE_SMILLA>', 'Smilla')
+on conflict (user_id) do update set display_name = excluded.display_name;
+```
+
+Controlla che ci siano esattamente le due righe attese:
+
+```sql
+select user_id, display_name from public.album_members order by display_name;
+```
+
+Gli UUID non vanno inseriti nel frontend. L'app verifica `is_album_member()` dopo il login e al successivo accesso alle foto. Un account esistente ma assente dalla tabella viene disconnesso e non entra nel sito.
+
+## 3. Verifica database e Storage
+
+La migrazione versionata è [`supabase/migrations/20261106000100_private_album_schema.sql`](supabase/migrations/20261106000100_private_album_schema.sql). Contiene `album_members`, `photos`, `playlists`, `site_settings`, RLS e policy Storage per `album`. Se l'hai già applicata, non occorre rieseguirla: questa fase non aggiunge tabelle, policy o funzioni.
+
+In **Storage**, verifica che `album` risulti privato. Non renderlo pubblico. Le foto vengono mostrate tramite URL firmati temporanei di cinque minuti, generati soltanto dopo l'autorizzazione del membro.
+
+## 4. Configura l'ambiente locale
+
+1. In **Project Settings → API** copia il Project URL e la Publishable Key.
+2. Nella cartella del progetto crea `.env` da `.env.example`:
 
    ```powershell
    Copy-Item .env.example .env
    ```
 
-4. Inserisci i due valori nel file `.env`:
+3. Inserisci i valori:
 
    ```dotenv
    VITE_SUPABASE_URL=https://<project-ref>.supabase.co
    VITE_SUPABASE_PUBLISHABLE_KEY=<chiave-pubblicabile>
    ```
 
-   Questi valori sono destinati al browser. **Non inserire mai `service_role`, secret key, password o credenziali amministrative** in `.env`, nel sito o in GitHub. Il file `.env` è escluso da Git.
+La Publishable Key è destinata al browser; non inserire mai `service_role`, una Secret Key o password nel repository. `.env` è escluso da Git.
 
-## 2. Verifica preliminare dello schema e del bucket
-
-Il progetto locale non contiene migrazioni Supabase precedenti, ma non posso vedere il database del tuo progetto dalla cartella. Prima di applicare la migrazione, controlla in **Table Editor** che non esistano già tabelle equivalenti chiamate `album_members`, `photos`, `playlists` o `site_settings`. La migrazione usa `CREATE TABLE` senza sovrascritture: se una tabella omonima esiste, si fermerà e dovrai confrontare gli schemi prima di proseguire.
-
-In **Storage** verifica che esista il bucket `album`. La migrazione lo imposta esplicitamente come **privato**, con limite di 12 MiB e tipo `image/webp`. L'upload del sito ricodifica le foto in WebP prima di inviarle.
-
-## 3. Migrazione SQL
-
-1. Apri **SQL Editor** nel progetto Supabase.
-2. Crea una nuova query e incolla l'intero contenuto di [`supabase/migrations/20261106000100_private_album_schema.sql`](supabase/migrations/20261106000100_private_album_schema.sql).
-3. Esegui la query e verifica che termini con `COMMIT` senza errori.
-
-La migrazione crea le tabelle `photos`, `playlists`, `site_settings` e `album_members`, gli indici cronologici, RLS e policy specifiche per il bucket. La tabella `album_members` non è scrivibile dai client: gli ID Supabase dei due utenti dovranno essere inseriti manualmente solo nella fase in cui deciderai di attivare Auth. Non creare account per questo passaggio.
-
-La policy restrittiva del bucket limita l'accesso ai membri autorizzati anche se nel progetto esistono altre policy permissive. La policy riguarda solo gli oggetti del bucket `album`; non concede accessi agli altri bucket.
-
-## 4. Avvio locale
-
-Installa Node.js 20.19+ o 22.12+ e npm, poi dalla cartella del progetto esegui:
+Avvia il sito:
 
 ```powershell
 npm install
 npm run dev
 ```
 
-Apri l'indirizzo locale stampato da Vite. Non aprire `index.html` direttamente come `file://`, perché il progetto ora usa moduli JavaScript e variabili Vite.
+Con Supabase configurato compare il login email/password e viene ripristinata automaticamente la sessione esistente. Senza configurazione resta disponibile la schermata dimostrativa preesistente per l'album locale; quella password non protegge dati online.
 
-Senza URL e chiave, l'album locale esistente continua a usare IndexedDB su questo dispositivo. Con la configurazione Supabase, la pagina mostra chiaramente che l'album remoto è in attesa dell'accesso Auth; non carica né rende pubbliche le foto in assenza di una sessione.
+## 5. Build e Cloudflare Pages
 
-## 5. Cosa è predisposto nel codice
-
-- Lettura dei metadati da `photos` e URL firmati temporanei di cinque minuti per immagini private.
-- Upload singolo o multiplo, anteprima/rimozione dalla selezione, data condivisa del gruppo e didascalia facoltativa.
-- Ricodifica WebP con dimensione massima di 2560 px: i nuovi file non contengono i metadati EXIF/GPS e gli originali sul computer non vengono modificati.
-- Eliminazione con controllo degli errori e tentativo di ripristino del file se la cancellazione del record fallisce.
-- Controllo dell'album online all'apertura della sezione e aggiornamento ogni 4 minuti quando la sezione Album è attiva.
-- API dati per le playlist condivise; l'interfaccia Spotify attuale continua a usare la cronologia locale finché non sarà disponibile una sessione autorizzata.
-
-La parte remota resterà bloccata fino all'autenticazione: non ci sono ancora login, utenti creati dal sito, logout o autorizzazione dei due account. Il controllo password dimostrativo preesistente è solo una schermata client-side e **non** protegge contenuti online.
-
-## 6. Build e Cloudflare Pages
-
-Per verificare il build locale:
-
-```powershell
-npm run build
-```
-
-Impostazioni Cloudflare Pages per il deployment, da configurare quando il repository GitHub privato è collegato:
+Verifica il build locale con `npm run build`. Per Cloudflare Pages usa:
 
 - **Build command:** `npm run build`
 - **Build output directory:** `dist`
-- **Environment variables di build:** `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`
+- **Variabili di build:** `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY`
 
-Le variabili `VITE_` finiscono nel bundle browser: inserisci esclusivamente URL e chiave pubblicabili. Il deployment e la connessione del repository non sono stati eseguiti da questa modifica.
+Imposta le stesse due variabili in **Settings → Environment variables** per gli ambienti Production e Preview che vuoi usare. Il sito usa accesso password, senza link di callback o recupero password; non occorre configurare redirect Auth per il login corrente. Il deployment non è incluso in questa modifica.
 
-## 7. Backup manuale
+## 6. Test consigliati
 
-Prima di usare dati reali, conserva periodicamente una copia fuori dal progetto:
+1. Accedi localmente con ciascuno dei due account e ricarica la pagina: la sessione deve essere ripristinata.
+2. Prova una password errata: deve apparire un messaggio in italiano.
+3. Accedi con un account Auth presente ma non inserito in `album_members`: il sito deve respingerlo e disconnetterlo.
+4. Con ciascun membro prova a leggere, caricare e rimuovere una foto. Controlla che le nuove immagini appaiano in Storage sotto `album` e restino non pubbliche.
+5. Premi **Esci** e verifica che ritorni la schermata di login.
+6. Come controllo RLS, usa una sessione anonima e verifica che non possa leggere `photos` né scaricare oggetti da `album`.
 
-1. Da **Table Editor** esporta `photos`, `playlists` e `site_settings` come CSV.
-2. Da **Storage → album** scarica i file originali WebP, mantenendo i percorsi/mese.
-3. Archivia CSV e file fotografici in una cartella di backup non pubblica e verifica ogni tanto di poterli riaprire.
-4. Per ripristinare, ricarica prima i file in `album` e poi importa i metadati in modo che `storage_path` corrisponda ai percorsi caricati.
+Le policy RLS restano l'autorità effettiva: nascondere l'interfaccia o non conoscere un URL non sostituisce i controlli sul database e sul bucket.
 
-Non è implementato un backup automatico o un comando per cancellare l'intero album.
+## 7. Cosa resta locale
 
-## 8. Verifiche di sicurezza da completare
-
-Senza credenziali e senza autenticazione non è possibile testare l'accesso di un membro, upload o cancellazione reali. Dopo la fase Auth verifica nel progetto:
-
-- anon non legge righe da `photos` e non può scaricare né caricare oggetti in `album`;
-- un utente autenticato non presente in `album_members` è respinto;
-- entrambi i membri possono leggere e gestire le foto;
-- un URL firmato scade dopo cinque minuti;
-- file e metadati sono rimossi/recuperati correttamente nei casi di errore.
-
-Non applicare dati privati reali prima di aver completato questi controlli.
+La playlist Spotify continua a usare la cronologia locale del browser; l'API per le playlist condivise è preparata, ma la relativa interfaccia condivisa non fa parte di questo intervento. Le foto già salvate in IndexedDB restano sul dispositivo e non vengono migrate automaticamente. Il contatore, i testi e le altre sezioni non sono stati modificati.

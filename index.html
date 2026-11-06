@@ -21,11 +21,20 @@
         <p class="eyebrow">IL NOSTRO ANGOLINO PERSONALE 🫰</p>
         <h1>smilla<span>&</span>tommaso</h1>
         <p class="lock-subtitle">Perché anche se non sono con te,<br>Questa parte di me lo è.</p>
-        <form id="unlock-form">
+        <form id="unlock-form" class="hidden">
           <label class="sr-only" for="password-input">La nostra password</label>
           <input id="password-input" type="password" placeholder="Indizio: ci siamo conosciouti all'…" autocomplete="current-password" required>
           <button class="primary-button" type="submit">Entra nel nostro mondo <span>♡</span></button>
           <p id="password-message" class="form-message" aria-live="polite"></p>
+        </form>
+        <p id="auth-checking" class="form-message auth-checking" role="status" aria-live="polite">Controllo la sessione privata…</p>
+        <form id="auth-form" class="auth-form hidden">
+          <label for="auth-email">Email</label>
+          <input id="auth-email" type="email" name="email" autocomplete="username" inputmode="email" required>
+          <label for="auth-password">Password</label>
+          <input id="auth-password" type="password" name="password" autocomplete="current-password" required>
+          <button id="auth-submit" class="primary-button" type="submit">Accedi al nostro mondo <span>♡</span></button>
+          <p id="auth-message" class="form-message" role="status" aria-live="polite"></p>
         </form>
         <p class="lock-footnote">(Altro che il cuore di Enea...qualità!)</p>
       </div>
@@ -40,6 +49,7 @@
           <button class="nav-link" data-view="together">Noi</button>
           <button class="nav-link" data-view="letter">Lettera</button>
         </nav>
+        <button id="logout-button" class="logout-button hidden" type="button">Esci</button>
         <button id="music-toggle" class="music-toggle" aria-expanded="false" aria-controls="music-panel"><span class="music-note">♫</span><span>La nostra musica</span><span class="music-equalizer" aria-hidden="true"><i></i><i></i><i></i></span></button>
       </header>
       <section id="music-panel" class="music-panel hidden" aria-label="La nostra playlist">

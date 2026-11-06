@@ -44,7 +44,7 @@ create table public.site_settings (
 
 insert into public.site_settings (id) values ('global');
 
--- El elenco è compilato manualmente quando in una fase successiva verrà attivato Supabase Auth.
+-- Elenco compilato manualmente dalla dashboard dopo aver creato gli account Supabase Auth autorizzati.
 -- Non esistono policy di scrittura client per questa tabella: solo l'amministratore del progetto può aggiungere membri.
 alter table public.album_members enable row level security;
 alter table public.photos enable row level security;

@@ -9,11 +9,11 @@ Sito romantico realizzato con HTML, CSS e JavaScript. Mantiene il tema, la navig
 3. Esegui `npm install` e `npm run dev`.
 4. Per creare i file pubblicabili esegui `npm run build`; l'output è `dist/`.
 
-Per i passaggi Supabase, la migrazione SQL, Cloudflare Pages e i limiti della fase senza autenticazione consulta [SETUP_GUIDE.md](SETUP_GUIDE.md).
+Per la configurazione Supabase Auth, gli utenti autorizzati, la migrazione SQL e Cloudflare Pages consulta [SETUP_GUIDE.md](SETUP_GUIDE.md).
 
 ## Fase corrente e privacy
 
-In questa fase non è stato aggiunto alcun login o sistema account. La schermata password già presente è solo dimostrativa e non protegge il sito. Il bucket Storage `album` resta privato; le funzioni remote verificano una sessione Supabase e l'appartenenza a `album_members`. Fino all'attivazione dell'autenticazione, lettura, caricamento e cancellazione online restano bloccati. Non rendere pubblici i file per aggirare questo limite.
+Con Supabase configurato, il sito richiede un accesso email/password tramite Supabase Auth e accetta solo gli account presenti in `album_members`. Non esiste registrazione nel sito. Il bucket Storage `album` resta privato e le policy RLS/Storage continuano a verificare l'autorizzazione sul server. Senza configurazione Supabase, rimane disponibile la schermata password dimostrativa solo per l'album locale: non protegge contenuti remoti.
 
 Se Supabase non è configurato, l'album continua a salvare le foto in IndexedDB sul browser/dispositivo corrente; la cronologia Spotify resta in `localStorage` sul dispositivo corrente. Questi dati locali non si sincronizzano.
 
