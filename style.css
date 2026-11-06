@@ -280,3 +280,10 @@ em { color: var(--pink-strong); font-weight: 500; }
   .letter-open .letter-envelope { transform:translateX(-50%) translateY(250px) scale(.76); }
 }
 @media(max-width:390px) { .letter-paper { width:calc(100% - 12px); padding-left:17px; padding-right:17px; } .topbar nav { gap:6px; } .nav-link { font-size:9px; } }
+
+.photo-preview { display:flex; flex-wrap:wrap; gap:10px; }
+.photo-preview-item { display:grid; justify-items:center; gap:6px; width:118px; margin:0; padding:8px; border:1px solid rgba(189,113,143,.2); border-radius:12px; background:rgba(255,255,255,.7); }
+.photo-preview-item img { width:100px; height:80px; object-fit:contain; border-radius:7px; background:#fffafd; }
+.photo-preview-item figcaption { max-width:100%; overflow:hidden; color:var(--muted); font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+.photo-preview-item button { border:0; background:none; color:var(--pink-strong); font-size:10px; text-decoration:underline; }
+.supabase-status { max-width:650px; min-height:auto; margin:0 auto 12px; padding:0 12px; text-align:center; line-height:1.6; }

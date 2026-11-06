@@ -1,6 +1,9 @@
 // ================================
 /* smillaetommaso — impostazioni */
 // ================================
+import { supabaseConfigured } from "./src/supabase-client.js";
+import { deleteAlbumPhoto, getAlbumAccessMessage, loadAlbumPhotos, refreshAlbumPhotoUrl, uploadAlbumPhoto } from "./src/supabase-album.js";
+
 const SITE_PASSWORD = "orsa"; // Protezione dimostrativa: non è autenticazione reale.
 const START_DATE = new Date(2026, 10, 1, 0, 0, 0);
 // Incolla qui il link della playlist Spotify: lo collegheremo appena mi mandi il link.
@@ -29,6 +32,7 @@ function showView(name) {
   const target = $(`${name}-view`);
   if (target) target.classList.remove("hidden");
   document.querySelectorAll(".nav-link").forEach(button => button.classList.toggle("active", button.dataset.view === name));
+  if (name === "memories") refreshRemoteAlbum();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 document.querySelectorAll("[data-view]").forEach(button => button.addEventListener("click", () => showView(button.dataset.view)));
@@ -82,7 +86,8 @@ if (embedUrl) {
 
 // Album: una pagina per ogni data, massimo tre foto per pagina.
 const DB_NAME = "smillaetommaso-album", STORE_NAME = "uploaded-photos";
-let uploadedPhotos = [], albumPages = [], currentPage = 0, lightboxPhotos = [], currentLightbox = 0;
+let uploadedPhotos = [], supabasePhotos = [], albumPages = [], currentPage = 0, lightboxPhotos = [], currentLightbox = 0;
+let selectedFiles = [], previewUrls = [];
 function openPhotoDB() {
   return new Promise((resolve, reject) => {
     if (!("indexedDB" in window)) return reject(new Error("Questo browser non supporta il salvataggio locale delle foto."));
@@ -102,7 +107,11 @@ async function saveUploadedPhoto(photo) {
 }
 async function deleteUploadedPhoto(id) { const db=await openPhotoDB(); await new Promise((resolve,reject)=>{const tx=db.transaction(STORE_NAME,"readwrite");tx.objectStore(STORE_NAME).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();uploadedPhotos=uploadedPhotos.filter(p=>p.id!==id);buildPages();}
 function allPhotos() {
-  return [...photos.filter(p => p.src && p.date), ...uploadedPhotos].map((p, i) => ({ ...p, id: p.id || `built-${i}` })).sort((a,b) => a.date.localeCompare(b.date));
+  return [
+    ...photos.filter(p => p.src && p.date).map((p, i) => ({ ...p, id: p.id || `built-${i}`, source: "static" })),
+    ...uploadedPhotos.map(p => ({ ...p, source: "local" })),
+    ...supabasePhotos,
+  ].sort((a,b) => a.date.localeCompare(b.date) || (a.position ?? 0) - (b.position ?? 0) || String(a.created_at || "").localeCompare(String(b.created_at || "")));
 }
 function formatDate(iso) { return new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${iso}T12:00:00`)); }
 function formatMonth(iso) { return new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" }).format(new Date(`${iso}T12:00:00`)); }
@@ -142,7 +151,7 @@ function renderAlbum() {
   page.items.slice(0,3).forEach((photo, index) => {
     const figure = document.createElement("figure"); figure.className = `album-photo photo-count-${Math.min(page.items.length,3)}`;
     const img = document.createElement("img"); img.src = photo.src; img.alt = photo.caption || `Ricordo del ${formatDate(page.date)}`; img.loading = "lazy";
-    img.addEventListener("click", () => openAlbumLightbox(photo, page.items)); figure.appendChild(img); if (photo.id && !String(photo.id).startsWith("built-")) { const remove=document.createElement("button"); remove.type="button"; remove.className="remove-photo"; remove.textContent="Rimuovi foto"; remove.addEventListener("click",event=>{event.stopPropagation();if(confirm("Vuoi eliminare questa foto caricata?")) deleteUploadedPhoto(photo.id);}); figure.appendChild(remove); }
+    img.addEventListener("click", () => openAlbumLightbox(photo, page.items)); figure.appendChild(img); if (photo.source === "local" || photo.source === "supabase") { const remove=document.createElement("button"); remove.type="button"; remove.className="remove-photo"; remove.textContent="Rimuovi foto"; remove.addEventListener("click",event=>{event.stopPropagation();if(confirm("Vuoi eliminare questa foto caricata?")) removeAlbumPhoto(photo);}); figure.appendChild(remove); }
     if (photo.caption) { const caption = document.createElement("figcaption"); caption.textContent = photo.caption; figure.appendChild(caption); }
     content.appendChild(figure);
   });
@@ -162,26 +171,80 @@ $("period-index").addEventListener("change", event => { if (!event.target.value)
 // Inserimento foto: salvataggio persistente nel browser tramite IndexedDB.
 $("add-photo-toggle").addEventListener("click", () => { $("add-photo-form").classList.toggle("hidden"); });
 $("close-add-photo").addEventListener("click", () => $("add-photo-form").classList.add("hidden"));
-$("add-photo-form").addEventListener("submit", async event => {
-  event.preventDefault(); const file = $("photo-file").files[0], date = $("photo-date").value;
-  if (!file || !date) return;
-
-  if (!file.type.startsWith("image/")) { $("upload-status").textContent = "Scegli un file immagine valido."; return; }
-  if (file.size > 12 * 1024 * 1024) { $("upload-status").textContent = "Questa foto supera i 12 MB: scegli una versione più leggera."; return; }
-  const submit = event.submitter; submit.disabled = true; submit.textContent = "La sto aggiungendo…";
-  try {
-    const dataUrl = await new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
-    const photo = { id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, src: dataUrl, date, caption: $("photo-caption").value.trim(), name: file.name };
-    await saveUploadedPhoto(photo); uploadedPhotos.push(photo); buildPages(); currentPage = albumPages.findIndex(p => p.date === date && p.items.some(item => item.id === photo.id)); renderAlbum();
-    $("upload-status").textContent = "Aggiunta! Il ricordo è al suo posto. ♡"; $("add-photo-form").reset();
-  } catch (error) { console.error(error); $("upload-status").textContent = "Non sono riuscito a salvare la foto. Riprova con un'immagine più leggera."; }
-  finally { submit.disabled = false; submit.textContent = "Aggiungi al nostro album ♡"; }
+function renderPhotoPreview() {
+  previewUrls.forEach(url => URL.revokeObjectURL(url)); previewUrls = [];
+  const preview = $("photo-preview"); preview.replaceChildren();
+  selectedFiles.forEach((file, index) => {
+    const figure = document.createElement("figure"); figure.className = "photo-preview-item";
+    const image = document.createElement("img"), url = URL.createObjectURL(file); previewUrls.push(url); image.src = url; image.alt = `Anteprima ${file.name}`;
+    const caption = document.createElement("figcaption"); caption.textContent = `${file.name} · ${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+    const remove = document.createElement("button"); remove.type = "button"; remove.dataset.removeSelection = String(index); remove.textContent = "Rimuovi";
+    figure.append(image, caption, remove); preview.appendChild(figure);
+  });
+}
+$("photo-file").addEventListener("change", event => { selectedFiles = Array.from(event.target.files || []); renderPhotoPreview(); });
+$("photo-preview").addEventListener("click", event => {
+  const button = event.target.closest("[data-remove-selection]"); if (!button) return;
+  selectedFiles.splice(Number(button.dataset.removeSelection), 1);
+  try { const transfer = new DataTransfer(); selectedFiles.forEach(file => transfer.items.add(file)); $("photo-file").files = transfer.files; } catch { /* La selezione interna resta valida anche se il browser non espone DataTransfer. */ }
+  renderPhotoPreview();
 });
+$("add-photo-form").addEventListener("submit", async event => {
+  event.preventDefault(); const files = [...selectedFiles], date = $("photo-date").value, caption = $("photo-caption").value.trim();
+  if (!files.length) { $("upload-status").textContent = "Seleziona almeno una foto."; return; }
+  if (!date) { $("upload-status").textContent = "Scegli la data dello scatto."; return; }
+  const invalid = files.find(file => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 12 * 1024 * 1024);
+  if (invalid) { $("upload-status").textContent = invalid.size > 12 * 1024 * 1024 ? `La foto ${invalid.name} supera i 12 MB.` : `La foto ${invalid.name} non è JPEG, PNG o WebP.`; return; }
+  const submit = event.submitter; submit.disabled = true; submit.textContent = "Sto aggiungendo le foto…";
+  const added = [];
+  try {
+    if (supabaseConfigured) {
+      for (const [index, file] of files.entries()) {
+        $("upload-status").textContent = `Caricamento della foto ${index + 1} di ${files.length}…`;
+        const photo = await uploadAlbumPhoto(file, date, caption); supabasePhotos.push(photo); added.push(photo);
+      }
+    } else {
+      for (const [index, file] of files.entries()) {
+        $("upload-status").textContent = `Salvataggio della foto ${index + 1} di ${files.length} su questo dispositivo…`;
+        const dataUrl = await new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
+        const photo = { id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, src: dataUrl, date, caption, name: file.name };
+        await saveUploadedPhoto(photo); uploadedPhotos.push(photo); added.push(photo);
+      }
+    }
+    buildPages(); currentPage = albumPages.findIndex(page => page.items.some(item => added.some(photo => photo.id === item.id))); renderAlbum();
+    $("upload-status").textContent = supabaseConfigured ? `${added.length} ${added.length === 1 ? "foto caricata" : "foto caricate"} nel bucket privato.` : `${added.length} ${added.length === 1 ? "foto salvata" : "foto salvate"} su questo dispositivo.`;
+    $("add-photo-form").reset(); selectedFiles = []; renderPhotoPreview();
+  } catch (error) {
+    console.error(error);
+    buildPages();
+    $("upload-status").textContent = getAlbumAccessMessage(error) + (added.length ? ` Completate prima dell'errore: ${added.length} ${added.length === 1 ? "foto" : "foto"}.` : "");
+  } finally { submit.disabled = false; submit.textContent = "Aggiungi al nostro album ♡"; }
+});
+
+async function removeAlbumPhoto(photo) {
+  try {
+    if (photo.source === "supabase") {
+      await deleteAlbumPhoto(photo); supabasePhotos = supabasePhotos.filter(item => item.id !== photo.id);
+    } else {
+      await deleteUploadedPhoto(photo.id);
+    }
+    buildPages(); $("upload-status").textContent = "Foto rimossa dall'album.";
+  } catch (error) { $("upload-status").textContent = getAlbumAccessMessage(error); }
+}
 
 // Lightbox per guardare le foto più da vicino.
 const lightbox = $("lightbox"), lightboxImage = $("lightbox-image"), lightboxCaption = $("lightbox-caption");
-function openAlbumLightbox(photo, sameDay) { lightboxPhotos = sameDay; currentLightbox = sameDay.indexOf(photo); updateLightbox(); lightbox.classList.remove("hidden"); }
-function updateLightbox() { const photo = lightboxPhotos[currentLightbox]; lightboxImage.src = photo.src; lightboxImage.alt = photo.caption || "Un nostro ricordo"; lightboxCaption.textContent = photo.caption || formatDate(photo.date); }
+let lightboxLoadId = 0;
+function openAlbumLightbox(photo, sameDay) { lightboxPhotos = sameDay; currentLightbox = sameDay.indexOf(photo); lightbox.classList.remove("hidden"); updateLightbox(); }
+async function updateLightbox() {
+  const photo = lightboxPhotos[currentLightbox], loadId = ++lightboxLoadId;
+  if (!photo) return;
+  try {
+    const src = photo.source === "supabase" ? await refreshAlbumPhotoUrl(photo) : photo.src;
+    if (loadId !== lightboxLoadId) return;
+    lightboxImage.src = src; lightboxImage.alt = photo.caption || "Un nostro ricordo"; lightboxCaption.textContent = photo.caption || formatDate(photo.date);
+  } catch (error) { lightboxCaption.textContent = getAlbumAccessMessage(error); }
+}
 function moveLightbox(direction) { if (!lightboxPhotos.length) return; currentLightbox = (currentLightbox + direction + lightboxPhotos.length) % lightboxPhotos.length; updateLightbox(); }
 $("lightbox-close").addEventListener("click", () => lightbox.classList.add("hidden")); $("lightbox-prev").addEventListener("click", () => moveLightbox(-1)); $("lightbox-next").addEventListener("click", () => moveLightbox(1));
 lightbox.addEventListener("click", event => { if (event.target === lightbox) lightbox.classList.add("hidden"); });
@@ -232,7 +295,40 @@ $("cat-character").addEventListener("click", () => {
     tail.classList.remove("tail-leaving");
   });
 });
-readUploadedPhotos().then(buildPages);
+async function refreshRemoteAlbum() {
+  const status = $("supabase-status"), note = $("upload-note");
+  if (!supabaseConfigured) {
+    status.textContent = "Supabase non configurato: l'album attuale continua a salvare le foto solo su questo dispositivo.";
+    note.textContent = "Le foto aggiunte qui restano in questo browser e su questo dispositivo finché non configuri Supabase.";
+    return;
+  }
+  status.textContent = "Verifico l'accesso all'album privato…";
+  note.textContent = "Le foto online vengono ottimizzate e caricate nel bucket privato album. L'accesso remoto richiede una sessione autorizzata.";
+  try {
+    supabasePhotos = await loadAlbumPhotos();
+    buildPages();
+    if (!$("lightbox").classList.contains("hidden") && lightboxPhotos[currentLightbox]?.source === "supabase") {
+      const replacement = supabasePhotos.find(photo => photo.id === lightboxPhotos[currentLightbox].id);
+      if (replacement) { lightboxPhotos[currentLightbox] = replacement; updateLightbox(); }
+    }
+    status.textContent = supabasePhotos.length
+      ? "Album privato aggiornato. Le immagini usano collegamenti temporanei rinnovati durante la consultazione."
+      : "Accesso Supabase autorizzato. L'album online non contiene ancora fotografie.";
+  } catch (error) {
+    if (error?.code === "auth_required") supabasePhotos = [];
+    if (error?.code === "not_authorized") supabasePhotos = [];
+    if (error?.code === "auth_required" || error?.code === "not_authorized") buildPages();
+    status.textContent = getAlbumAccessMessage(error);
+  }
+}
+
+readUploadedPhotos().then(async () => { buildPages(); await refreshRemoteAlbum(); });
+setInterval(() => {
+  if (supabaseConfigured && !$("memories-view").classList.contains("hidden") && document.visibilityState === "visible") refreshRemoteAlbum();
+}, 240_000);
+document.addEventListener("visibilitychange", () => {
+  if (supabaseConfigured && document.visibilityState === "visible" && !$("memories-view").classList.contains("hidden")) refreshRemoteAlbum();
+});
 
 // Porta a maiuscola l'iniziale dei testi visibili, inclusi gli aggiornamenti dinamici.
 function capitalizeInitial(value) { return value.replace(/^(\s*)([a-zà-öø-ÿ])/u, (_, space, letter) => space + letter.toLocaleUpperCase("it-IT")); }

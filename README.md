@@ -1,35 +1,22 @@
 # smillaetommaso ♡
 
-Piccolo sito statico romantico realizzato con HTML, CSS e JavaScript.
+Sito romantico realizzato con HTML, CSS e JavaScript. Mantiene il tema, la navigazione, l'album cronologico, la lettera, Macchia, il contatore e il lettore Spotify.
 
-## Aprirlo sul computer
+## Avvio locale
 
-1. Estrai la cartella `smillaetommaso` dallo ZIP.
-2. Apri la cartella in Visual Studio Code.
-3. Avvia `index.html` con l'estensione **Live Server** (consigliato), oppure apri direttamente il file nel browser.
+1. Installa Node.js 20.19+ o 22.12+.
+2. Copia `.env.example` in `.env` e inserisci il Project URL e la Publishable Key Supabase, se disponibili.
+3. Esegui `npm install` e `npm run dev`.
+4. Per creare i file pubblicabili esegui `npm run build`; l'output è `dist/`.
 
-## Password dimostrativa
+Per i passaggi Supabase, la migrazione SQL, Cloudflare Pages e i limiti della fase senza autenticazione consulta [SETUP_GUIDE.md](SETUP_GUIDE.md).
 
-La password di prova è definita all'inizio di `script.js`, nella costante `SITE_PASSWORD`.
+## Fase corrente e privacy
 
-**Attenzione:** il controllo della password avviene nel browser e non protegge davvero i contenuti. Non pubblicare foto private finché non sarà stato aggiunto un sistema di autenticazione reale e un archivio protetto.
+In questa fase non è stato aggiunto alcun login o sistema account. La schermata password già presente è solo dimostrativa e non protegge il sito. Il bucket Storage `album` resta privato; le funzioni remote verificano una sessione Supabase e l'appartenenza a `album_members`. Fino all'attivazione dell'autenticazione, lettura, caricamento e cancellazione online restano bloccati. Non rendere pubblici i file per aggirare questo limite.
 
-## Album fotografico
-
-- Una pagina corrisponde a una data.
-- Ogni giornata può contenere al massimo tre fotografie.
-- Le pagine vengono ordinate automaticamente in ordine cronologico.
-- L'indice permette di saltare al primo giorno di un determinato mese.
-- Il pulsante **Aggiungi una foto** permette di scegliere la data e caricare un'immagine.
-- Le foto caricate vengono salvate in IndexedDB nel browser e sul dispositivo utilizzato. Non vengono caricate online e non si sincronizzano con altri dispositivi.
-- Le foto già presenti nel progetto si possono inserire nell'array `photos` in `script.js`, indicando `src`, `date` (formato `AAAA-MM-GG`) e, facoltativamente, `caption`.
-
-Per rendere l'album condiviso tra dispositivi servirà collegare un servizio di archiviazione online e un'autenticazione vera.
-
-## Playlist
-
-Quando hai il link di condivisione della playlist Spotify, inseriscilo nella costante `SPOTIFY_PLAYLIST_URL` in `script.js`. Il player integrato mostrerà la playlist tramite il lettore ufficiale Spotify.
+Se Supabase non è configurato, l'album continua a salvare le foto in IndexedDB sul browser/dispositivo corrente; la cronologia Spotify resta in `localStorage` sul dispositivo corrente. Questi dati locali non si sincronizzano.
 
 ## Contatore
 
-La data di inizio è impostata nella costante `START_DATE` in `script.js`.
+La data e il calcolo del contatore restano definiti all'inizio di `script.js`.
