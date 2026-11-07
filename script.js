@@ -580,11 +580,14 @@ function revealCatHint() {
 }
 function closeCat() {
   const tail = $("cat-friend"), cat = $("cat-character");
+  const restoreFocus = cat && (document.activeElement === cat || document.activeElement === $("cat-message"));
+  cat?.blur(); $("cat-message")?.blur();
   resetCatHint();
   $("cat-message")?.classList.remove("cat-touch-visible", "cat-touch-exiting");
   cat?.classList.remove("cat-entering", "cat-exiting"); cat?.classList.add("hidden");
   if (tail?._catReveal) tail.removeEventListener("transitionend", tail._catReveal);
   if (tail) { tail._catReveal = null; tail.classList.remove("tail-leaving"); tail.classList.add("hidden"); void tail.offsetWidth; tail.classList.remove("hidden"); }
+  if (restoreFocus) tail?.focus({ preventScroll: true });
 }
 $("cat-friend").addEventListener("click", () => {
   const tail = $("cat-friend"), cat = $("cat-character");
@@ -616,12 +619,15 @@ $("cat-character").addEventListener("click", () => {
   cat.addEventListener("transitionend", function restoreTail(event) {
     if (event.propertyName !== "transform") return;
     cat.removeEventListener("transitionend", restoreTail);
+    const restoreFocus = document.activeElement === cat || document.activeElement === $("cat-message");
+    cat.blur(); $("cat-message").blur();
     cat.classList.remove("cat-exiting"); cat.classList.add("hidden");
     resetCatHint();
     $("cat-message").classList.remove("cat-touch-visible", "cat-touch-exiting");
     tail.classList.remove("hidden");
     void tail.offsetWidth;
     tail.classList.remove("tail-leaving");
+    if (restoreFocus) tail.focus({ preventScroll: true });
   });
 });
 $("cat-message").addEventListener("click", () => $("cat-character").click());

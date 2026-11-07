@@ -60,7 +60,19 @@ export async function refreshAlbumPhotoUrl(photo) {
 }
 
 async function inspectImageFile(file) {
-  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const headerBlob = file.slice(0, 16);
+  let header;
+  if (typeof headerBlob.arrayBuffer === "function") {
+    try { header = new Uint8Array(await headerBlob.arrayBuffer()); } catch { /* Usa FileReader sui browser mobili con implementazioni parziali di Blob. */ }
+  }
+  if (!header) {
+    header = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(new Uint8Array(reader.result));
+      reader.onerror = () => reject(new Error("Impossibile leggere l'intestazione dell'immagine."));
+      reader.readAsArrayBuffer(headerBlob);
+    });
+  }
   const ascii = String.fromCharCode(...header);
   if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return "jpeg";
   if (ascii.startsWith("\x89PNG\r\n\x1a\n")) return "png";
@@ -76,13 +88,7 @@ async function inspectImageFile(file) {
   throw new Error("Questo file non sembra una fotografia supportata.");
 }
 
-async function decodeInBrowser(file) {
-  if (typeof createImageBitmap === "function") {
-    try {
-      const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-      return { image: bitmap, release: () => bitmap.close() };
-    } catch { /* Alcuni browser non decodificano HEIF nel percorso nativo. */ }
-  }
+async function decodeWithImageElement(file) {
   const url = URL.createObjectURL(file);
   try {
     const image = await new Promise((resolve, reject) => {
@@ -96,6 +102,27 @@ async function decodeInBrowser(file) {
     URL.revokeObjectURL(url);
     throw error;
   }
+}
+
+async function decodeWithImageBitmap(file) {
+  if (typeof createImageBitmap !== "function") throw new Error("Decodifica ImageBitmap non disponibile.");
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  return { image: bitmap, release: () => bitmap.close() };
+}
+
+async function decodeInBrowser(file) {
+  // WebKit ha avuto problemi con EXIF e ImageBitmap creati direttamente da Blob;
+  // l'elemento Image applica correttamente l'orientamento degli scatti iPhone.
+  const appleWebKit = navigator.vendor === "Apple Computer, Inc." || /iPhone|iPad|iPod/.test(navigator.userAgent)
+    || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const decoders = appleWebKit
+    ? [decodeWithImageElement, decodeWithImageBitmap]
+    : [decodeWithImageBitmap, decodeWithImageElement];
+  let lastError;
+  for (const decode of decoders) {
+    try { return await decode(file); } catch (error) { lastError = error; }
+  }
+  throw lastError || new Error("Decodifica non disponibile.");
 }
 
 let heifDecoderPromise;
