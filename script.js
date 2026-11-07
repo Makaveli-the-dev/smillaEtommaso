@@ -106,7 +106,17 @@ document.addEventListener("click", event => {
   if (!event.target.closest(".profile-wrap")) { profilePanel.classList.add("hidden"); profileToggle.setAttribute("aria-expanded", "false"); }
 });
 document.addEventListener("keydown", event => {
-  if (event.key === "Escape") { profilePanel.classList.add("hidden"); profileToggle.setAttribute("aria-expanded", "false"); }
+  if (event.key === "Escape") {
+    profilePanel.classList.add("hidden"); profileToggle.setAttribute("aria-expanded", "false");
+    if (!$("letter-password-modal").classList.contains("hidden")) closeLetterPasswordModal();
+  }
+  const modal = $("letter-password-modal");
+  if (event.key === "Tab" && !modal.classList.contains("hidden")) {
+    const controls = [...modal.querySelectorAll("button, input")].filter(control => !control.disabled);
+    const first = controls[0], last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
 });
 
 async function initializeAuthentication() {
@@ -148,7 +158,7 @@ function showView(name) {
     return;
   }
   closeCat();
-  if (name !== "letter") closeLetter();
+  if (name !== "letter") { closeLetter(); closeLetterPasswordModal(); }
   document.querySelectorAll(".view").forEach(view => view.classList.add("hidden"));
   const target = $(`${name}-view`);
   if (target) target.classList.remove("hidden");
@@ -167,17 +177,44 @@ let letterUnlocked = false;
 function lockLetter() {
   letterUnlocked = false;
   closeLetter();
+  closeLetterPasswordModal(false);
 }
+function closeLetterPasswordModal(restoreFocus = true) {
+  const modal = $("letter-password-modal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  modal.classList.add("hidden");
+  if (restoreFocus) $("letter-toggle").focus();
+}
+function openLetterPasswordModal() {
+  const modal = $("letter-password-modal");
+  modal.classList.remove("hidden");
+  $("letter-password-input").value = "";
+  $("letter-password-message").textContent = "";
+  requestAnimationFrame(() => $("letter-password-input").focus());
+}
+$("letter-password-close").addEventListener("click", () => closeLetterPasswordModal());
+$("letter-password-modal").addEventListener("click", event => {
+  if (event.target === $("letter-password-modal")) closeLetterPasswordModal();
+});
+$("letter-password-form").addEventListener("submit", event => {
+  event.preventDefault();
+  const input = $("letter-password-input"), message = $("letter-password-message");
+  if (input.value !== LETTER_PASSWORD) {
+    message.textContent = "La parola non è quella giusta… riprova con il nostro segreto ♡";
+    input.value = ""; input.focus();
+    return;
+  }
+  letterUnlocked = true;
+  closeLetterPasswordModal(false);
+  const scene = $("letter-scene"), toggle = $("letter-toggle"), paper = $("letter-paper");
+  scene.classList.add("letter-open"); toggle.setAttribute("aria-expanded", "true"); toggle.setAttribute("aria-label", "Richiudi la lettera"); paper.setAttribute("aria-hidden", "false"); paper.inert = false;
+  $("letter-close").focus();
+});
 $("letter-toggle").addEventListener("click", () => {
   const scene = $("letter-scene"), toggle = $("letter-toggle"), paper = $("letter-paper");
   if (!letterUnlocked) {
-    const answer = window.prompt("Inserisci la parola d'ordine per aprire la lettera:");
-    if (answer === null) return;
-    if (answer !== LETTER_PASSWORD) {
-      window.alert("La parola d'ordine non è corretta. Riprova.");
-      return;
-    }
-    letterUnlocked = true;
+    openLetterPasswordModal();
+    return;
   }
   const opening = !scene.classList.contains("letter-open");
   scene.classList.toggle("letter-open", opening); toggle.setAttribute("aria-expanded", String(opening)); toggle.setAttribute("aria-label", opening ? "Richiudi la lettera" : "Apri la lettera"); paper.setAttribute("aria-hidden", String(!opening)); paper.inert = !opening;
@@ -396,7 +433,7 @@ updateCounter(); setInterval(updateCounter,1000);
 $("secret-button").addEventListener("click", () => $("secret-message").classList.toggle("hidden"));
 function closeCat() {
   const tail = $("cat-friend"), cat = $("cat-character");
-  $("cat-message")?.classList.remove("cat-touch-visible");
+  $("cat-message")?.classList.remove("cat-touch-visible", "cat-touch-exiting");
   cat?.classList.remove("cat-entering", "cat-exiting"); cat?.classList.add("hidden");
   if (tail?._catReveal) tail.removeEventListener("transitionend", tail._catReveal);
   if (tail) { tail._catReveal = null; tail.classList.remove("tail-leaving"); tail.classList.add("hidden"); void tail.offsetWidth; tail.classList.remove("hidden"); }
@@ -420,12 +457,17 @@ $("cat-friend").addEventListener("click", () => {
 $("cat-character").addEventListener("click", () => {
   const tail = $("cat-friend"), cat = $("cat-character");
   if (cat.classList.contains("cat-exiting")) return;
+  const touchInteraction = !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  if (touchInteraction) {
+    $("cat-message").classList.remove("cat-touch-visible");
+    $("cat-message").classList.add("cat-touch-exiting");
+  }
   cat.classList.remove("cat-entering"); cat.classList.add("cat-exiting");
   cat.addEventListener("transitionend", function restoreTail(event) {
     if (event.propertyName !== "transform") return;
     cat.removeEventListener("transitionend", restoreTail);
     cat.classList.remove("cat-exiting"); cat.classList.add("hidden");
-    $("cat-message").classList.remove("cat-touch-visible");
+    $("cat-message").classList.remove("cat-touch-visible", "cat-touch-exiting");
     tail.classList.remove("hidden");
     void tail.offsetWidth;
     tail.classList.remove("tail-leaving");

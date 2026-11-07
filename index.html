@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#f8e8ef">
   <meta name="description" content="Il piccolo universo di Smilla e Tommaso.">
   <title>smillaetommaso ♡</title>
@@ -113,6 +113,21 @@
       </section>
       <section id="letter-view" class="view hidden">
         <div class="page-heading"><p class="eyebrow">UN PICCOLO SEGRETO PER TE</p><h2>Una <em>lettera.</em></h2><p>Una busta, un pensiero e un momento tutto tuo.</p></div>
+        <div id="letter-password-modal" class="letter-password-modal hidden" role="dialog" aria-modal="true" aria-labelledby="letter-password-title">
+          <div class="lock-card letter-password-card">
+            <button type="button" id="letter-password-close" class="letter-password-close" aria-label="Chiudi">×</button>
+            <div class="tiny-orbit" aria-hidden="true">✧</div>
+            <p class="eyebrow">UN PICCOLO SEGRETO PER TE</p>
+            <h1 id="letter-password-title">Una parola per la lettera</h1>
+            <p class="lock-subtitle">Inserisci la parola d'ordine per leggere il mio pensiero.</p>
+            <form id="letter-password-form" class="auth-form letter-password-form">
+              <label for="letter-password-input">La parola d'ordine</label>
+              <input id="letter-password-input" type="password" autocomplete="off" required>
+              <button class="primary-button" type="submit">Apri la lettera <span>♡</span></button>
+              <p id="letter-password-message" class="form-message" role="status" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
         <div class="letter-scene" id="letter-scene">
           <button type="button" class="letter-envelope" id="letter-toggle" aria-expanded="false" aria-controls="letter-paper" aria-label="Apri la lettera">
             <span class="envelope-back"></span><span class="envelope-letter-peek" aria-hidden="true"></span><span class="envelope-flap"></span><span class="envelope-pocket"></span><span class="envelope-seal" aria-hidden="true">♡</span><span class="envelope-prompt">Apri la lettera</span>
