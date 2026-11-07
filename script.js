@@ -2,10 +2,12 @@
 /* smillaetommaso — impostazioni */
 // ================================
 import { getAuthErrorMessage, logAuthDiagnostic, requireAlbumMember, signInAlbumMember, signOutAlbumMember, supabase, supabaseConfigured } from "./src/supabase-client.js";
-import { deleteAlbumPhoto, getAlbumAccessMessage, loadAlbumPhotos, refreshAlbumPhotoUrl, uploadAlbumPhoto } from "./src/supabase-album.js";
+import { deleteAlbumPhoto, getAlbumAccessMessage, loadAlbumPhotos, prepareAlbumPhoto, refreshAlbumPhotoUrl, uploadAlbumPhoto } from "./src/supabase-album.js";
 
 const SITE_PASSWORD = "orsa"; // Protezione dimostrativa: non è autenticazione reale.
-const LETTER_PASSWORD = "lettera"; // Sostituisci qui il segnaposto con la parola scelta da te.
+const LETTER_PASSWORD = "cassago"; // Parola d'ordine per leggere la lettera.
+const LETTER_COUPON_CODE = "050926"; // Codice della caccia al coupon.
+const COUPON_IMAGE_URL = "/assets/coupon/coupon-smilla.png"; // File atteso in public/assets/coupon/coupon-smilla.png.
 const START_DATE = new Date(2026, 10, 1, 0, 0, 0);
 // Incolla qui il link della playlist Spotify: lo collegheremo appena mi mandi il link.
 const SPOTIFY_PLAYLIST_URL = "https://open.spotify.com/playlist/37i9dQZF1EJCslRrsK5s1E";
@@ -106,17 +108,27 @@ document.addEventListener("click", event => {
   if (!event.target.closest(".profile-wrap")) { profilePanel.classList.add("hidden"); profileToggle.setAttribute("aria-expanded", "false"); }
 });
 document.addEventListener("keydown", event => {
+  const passwordModal = $("letter-password-modal"), couponModal = $("coupon-modal");
+  const activeModal = [passwordModal, couponModal].find(modal => modal && !modal.classList.contains("hidden"));
   if (event.key === "Escape") {
     profilePanel.classList.add("hidden"); profileToggle.setAttribute("aria-expanded", "false");
-    if (!$("letter-password-modal").classList.contains("hidden")) closeLetterPasswordModal();
+    if (activeModal === passwordModal) closeLetterPasswordModal();
+    else if (activeModal === couponModal) closeCouponModal();
+    if (activeModal) { event.preventDefault(); return; }
   }
-  const modal = $("letter-password-modal");
-  if (event.key === "Tab" && !modal.classList.contains("hidden")) {
-    const controls = [...modal.querySelectorAll("button, input")].filter(control => !control.disabled);
+  if (activeModal && event.key === "Tab") {
+    const controls = [...activeModal.querySelectorAll("button, input")].filter(control => !control.disabled);
     const first = controls[0], last = controls.at(-1);
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    return;
   }
+  if (activeModal) return;
+  if ($("letter-view").classList.contains("hidden")) return;
+  if (/^\d$/.test(event.key)) { event.preventDefault(); appendLetterDigit(event.key); }
+  else if (event.key === "Backspace") { event.preventDefault(); removeLetterDigit(); }
+  else if (event.key === "Delete") { event.preventDefault(); clearLetterCode(); }
+  else if (event.key === "Enter" && !event.target.closest("button")) { event.preventDefault(); submitLetterCode(); }
 });
 
 async function initializeAuthentication() {
@@ -158,7 +170,7 @@ function showView(name) {
     return;
   }
   closeCat();
-  if (name !== "letter") { closeLetter(); closeLetterPasswordModal(); }
+  if (name !== "letter") { closeLetter(); closeLetterPasswordModal(false); closeCouponModal(false); }
   document.querySelectorAll(".view").forEach(view => view.classList.add("hidden"));
   const target = $(`${name}-view`);
   if (target) target.classList.remove("hidden");
@@ -172,24 +184,25 @@ function closeLetter() {
   const scene = $("letter-scene"), toggle = $("letter-toggle"), paper = $("letter-paper");
   if (!scene || !toggle || !paper) return;
   scene.classList.remove("letter-open"); toggle.setAttribute("aria-expanded", "false"); toggle.setAttribute("aria-label", "Apri la lettera"); paper.setAttribute("aria-hidden", "true"); paper.inert = true;
+  $("letter-keypad").inert = false;
 }
 let letterUnlocked = false;
-function lockLetter() {
-  letterUnlocked = false;
-  closeLetter();
-  closeLetterPasswordModal(false);
-}
+let letterCode = "";
 function closeLetterPasswordModal(restoreFocus = true) {
   const modal = $("letter-password-modal");
   if (!modal || modal.classList.contains("hidden")) return;
   modal.classList.add("hidden");
+  $("letter-scene").inert = false;
+  $("letter-keypad").inert = false;
   if (restoreFocus) $("letter-toggle").focus();
 }
 function openLetterPasswordModal() {
   const modal = $("letter-password-modal");
   modal.classList.remove("hidden");
+  $("letter-scene").inert = true;
   $("letter-password-input").value = "";
   $("letter-password-message").textContent = "";
+  $("letter-keypad").inert = true;
   requestAnimationFrame(() => $("letter-password-input").focus());
 }
 $("letter-password-close").addEventListener("click", () => closeLetterPasswordModal());
@@ -206,18 +219,108 @@ $("letter-password-form").addEventListener("submit", event => {
   }
   letterUnlocked = true;
   closeLetterPasswordModal(false);
-  const scene = $("letter-scene"), toggle = $("letter-toggle"), paper = $("letter-paper");
-  scene.classList.add("letter-open"); toggle.setAttribute("aria-expanded", "true"); toggle.setAttribute("aria-label", "Richiudi la lettera"); paper.setAttribute("aria-hidden", "false"); paper.inert = false;
-  $("letter-close").focus();
+  openLetter();
 });
-$("letter-toggle").addEventListener("click", () => {
+function renderLetterCode() {
+  $("keypad-indicator").querySelectorAll("span").forEach((slot, index) => slot.classList.toggle("filled", index < letterCode.length));
+  $("keypad-confirm").disabled = letterCode.length !== LETTER_COUPON_CODE.length;
+  $("keypad-status").textContent = `${letterCode.length} di ${LETTER_COUPON_CODE.length} cifre inserite.`;
+}
+function appendLetterDigit(digit) {
+  if (letterCode.length >= LETTER_COUPON_CODE.length) return;
+  letterCode += digit;
+  $("keypad-message").textContent = "";
+  renderLetterCode();
+}
+function removeLetterDigit() {
+  letterCode = letterCode.slice(0, -1);
+  $("keypad-message").textContent = "";
+  renderLetterCode();
+}
+function clearLetterCode() {
+  letterCode = "";
+  $("keypad-message").textContent = "";
+  renderLetterCode();
+}
+function openLetter() {
+  letterUnlocked = true;
   const scene = $("letter-scene"), toggle = $("letter-toggle"), paper = $("letter-paper");
-  if (!letterUnlocked) {
-    openLetterPasswordModal();
+  scene.classList.add("letter-open", "letter-unlocked");
+  $("letter-keypad").inert = false;
+  toggle.setAttribute("aria-expanded", "true"); toggle.setAttribute("aria-label", "Richiudi la lettera"); paper.setAttribute("aria-hidden", "false"); paper.inert = false;
+  $("letter-close").focus({ preventScroll: true });
+}
+function submitLetterCode() {
+  if (letterCode.length !== LETTER_COUPON_CODE.length) {
+    $("keypad-message").textContent = "Inserisci tutte e sei le cifre per scoprire il coupon.";
     return;
   }
+  if (letterCode !== LETTER_COUPON_CODE) {
+    letterCode = ""; renderLetterCode();
+    $("keypad-message").textContent = "Non è ancora il codice giusto… riprova, ci sei quasi ♡";
+    return;
+  }
+  letterCode = ""; renderLetterCode(); $("keypad-message").textContent = "";
+  openCouponModal();
+}
+function closeCouponModal(restoreFocus = true) {
+  const modal = $("coupon-modal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  modal.classList.add("hidden");
+  $("letter-scene").inert = false;
+  if (restoreFocus) $("keypad-keys").querySelector("button")?.focus();
+}
+function openCouponModal() {
+  $("coupon-modal").classList.remove("hidden");
+  $("coupon-download-status").textContent = "";
+  requestAnimationFrame(() => $("coupon-close").focus());
+}
+$("coupon-close").addEventListener("click", () => closeCouponModal());
+$("coupon-modal").addEventListener("click", event => {
+  if (event.target === $("coupon-modal")) closeCouponModal();
+});
+$("coupon-image").addEventListener("load", () => {
+  $("coupon-image").classList.remove("hidden");
+  $("coupon-image-placeholder").classList.add("hidden");
+  $("coupon-download").disabled = false;
+});
+$("coupon-image").addEventListener("error", () => {
+  $("coupon-image").classList.add("hidden");
+  $("coupon-image-placeholder").classList.remove("hidden");
+  $("coupon-image-placeholder").querySelector("small").textContent = "Aggiungi public/assets/coupon/coupon-smilla.png per attivare il download.";
+  $("coupon-download").disabled = true;
+});
+$("coupon-download").addEventListener("click", () => {
+  if (!$('coupon-image').naturalWidth) return;
+  const link = document.createElement("a");
+  link.href = COUPON_IMAGE_URL; link.download = "coupon-smilla.png";
+  document.body.appendChild(link); link.click(); link.remove();
+  $("coupon-download-status").textContent = "Il coupon è stato scaricato ♡";
+});
+$("keypad-keys").addEventListener("click", event => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  if (button.dataset.codeDigit !== undefined) appendLetterDigit(button.dataset.codeDigit);
+  else if (button.dataset.codeAction === "backspace") removeLetterDigit();
+  else if (button.dataset.codeAction === "clear") clearLetterCode();
+});
+$("keypad-confirm").addEventListener("click", submitLetterCode);
+$("coupon-image").src = COUPON_IMAGE_URL;
+function lockLetter() {
+  letterUnlocked = false;
+  closeLetter();
+  closeLetterPasswordModal(false);
+  closeCouponModal(false);
+  $("letter-scene").classList.remove("letter-unlocked");
+  letterCode = ""; renderLetterCode();
+  $("letter-keypad").inert = false;
+}
+$("letter-toggle").addEventListener("click", () => {
+  const scene = $("letter-scene"), toggle = $("letter-toggle"), paper = $("letter-paper");
+  if (!letterUnlocked) { openLetterPasswordModal(); return; }
   const opening = !scene.classList.contains("letter-open");
   scene.classList.toggle("letter-open", opening); toggle.setAttribute("aria-expanded", String(opening)); toggle.setAttribute("aria-label", opening ? "Richiudi la lettera" : "Apri la lettera"); paper.setAttribute("aria-hidden", String(!opening)); paper.inert = !opening;
+  $("letter-keypad").inert = false;
 });
 $("letter-close").addEventListener("click", () => { closeLetter(); $("letter-toggle").focus(); });
 
@@ -258,7 +361,13 @@ if (embedUrl) {
 // Album: una pagina per ogni data, massimo tre foto per pagina.
 const DB_NAME = "smillaetommaso-album", STORE_NAME = "uploaded-photos";
 let uploadedPhotos = [], supabasePhotos = [], albumPages = [], currentPage = 0, lightboxPhotos = [], currentLightbox = 0;
-let selectedFiles = [], previewUrls = [];
+let selectedFiles = [], previewUrls = [], preparedPhotoCache = new WeakMap();
+async function getPreparedPhoto(file) {
+  let prepared = preparedPhotoCache.get(file);
+  if (!prepared) { prepared = prepareAlbumPhoto(file); preparedPhotoCache.set(file, prepared); }
+  try { return await prepared; }
+  catch (error) { preparedPhotoCache.delete(file); throw error; }
+}
 function openPhotoDB() {
   return new Promise((resolve, reject) => {
     if (!("indexedDB" in window)) return reject(new Error("Questo browser non supporta il salvataggio locale delle foto."));
@@ -348,6 +457,13 @@ function renderPhotoPreview() {
   selectedFiles.forEach((file, index) => {
     const figure = document.createElement("figure"); figure.className = "photo-preview-item";
     const image = document.createElement("img"), url = URL.createObjectURL(file); previewUrls.push(url); image.src = url; image.alt = `Anteprima ${file.name}`;
+    image.addEventListener("error", async () => {
+      try {
+        const prepared = await getPreparedPhoto(file);
+        if (!figure.isConnected || !selectedFiles.includes(file)) return;
+        const preparedUrl = URL.createObjectURL(prepared); previewUrls.push(preparedUrl); image.onerror = null; image.src = preparedUrl;
+      } catch { if (figure.isConnected) { figure.classList.add("preview-unavailable"); image.alt = `Anteprima non disponibile per ${file.name}`; } }
+    }, { once: true });
     const caption = document.createElement("figcaption"); caption.textContent = `${file.name} · ${(file.size / (1024 * 1024)).toFixed(1)} MB`;
     const remove = document.createElement("button"); remove.type = "button"; remove.dataset.removeSelection = String(index); remove.textContent = "Rimuovi";
     figure.append(image, caption, remove); preview.appendChild(figure);
@@ -364,27 +480,36 @@ $("add-photo-form").addEventListener("submit", async event => {
   event.preventDefault(); const files = [...selectedFiles], date = $("photo-date").value, caption = $("photo-caption").value.trim();
   if (!files.length) { $("upload-status").textContent = "Seleziona almeno una foto."; return; }
   if (!date) { $("upload-status").textContent = "Scegli la data dello scatto."; return; }
-  const invalid = files.find(file => !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 12 * 1024 * 1024);
-  if (invalid) { $("upload-status").textContent = invalid.size > 12 * 1024 * 1024 ? `La foto ${invalid.name} supera i 12 MB.` : `La foto ${invalid.name} non è JPEG, PNG o WebP.`; return; }
   const submit = event.submitter; submit.disabled = true; submit.textContent = "Sto aggiungendo le foto…";
-  const added = [];
+  const added = [], failed = [], errors = [];
   try {
-    if (supabaseConfigured) {
-      for (const [index, file] of files.entries()) {
-        $("upload-status").textContent = `Caricamento della foto ${index + 1} di ${files.length}…`;
-        const photo = await uploadAlbumPhoto(file, date, caption); supabasePhotos.push(photo); added.push(photo);
-      }
-    } else {
-      for (const [index, file] of files.entries()) {
-        $("upload-status").textContent = `Salvataggio della foto ${index + 1} di ${files.length} su questo dispositivo…`;
-        const dataUrl = await new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file); });
-        const photo = { id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, src: dataUrl, date, caption, name: file.name };
-        await saveUploadedPhoto(photo); uploadedPhotos.push(photo); added.push(photo);
-      }
+    for (const [index, file] of files.entries()) {
+      try {
+        const prepared = await getPreparedPhoto(file);
+        if (supabaseConfigured) {
+          $("upload-status").textContent = `Caricamento della foto ${index + 1} di ${files.length}…`;
+          const photo = await uploadAlbumPhoto(file, date, caption, prepared); supabasePhotos.push(photo); added.push(photo);
+        } else {
+          $("upload-status").textContent = `Salvataggio della foto ${index + 1} di ${files.length} su questo dispositivo…`;
+          const dataUrl = await new Promise((resolve,reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(prepared); });
+          const name = `${file.name.replace(/\.[^.]+$/, "") || "foto"}.webp`;
+          const photo = { id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`, src: dataUrl, date, caption, name };
+          await saveUploadedPhoto(photo); uploadedPhotos.push(photo); added.push(photo);
+        }
+      } catch (error) { console.error("Errore durante la preparazione di una foto dell'album.", error); failed.push(file); errors.push(error); }
     }
-    buildPages(); currentPage = albumPages.findIndex(page => page.items.some(item => added.some(photo => photo.id === item.id))); renderAlbum();
-    $("upload-status").textContent = "";
-    $("add-photo-form").reset(); selectedFiles = []; renderPhotoPreview();
+    buildPages();
+    if (added.length) { const firstAddedPage = albumPages.findIndex(page => page.items.some(item => added.some(photo => photo.id === item.id))); if (firstAddedPage >= 0) currentPage = firstAddedPage; renderAlbum(); }
+    if (failed.length) {
+      selectedFiles = failed;
+      try { const transfer = new DataTransfer(); failed.forEach(file => transfer.items.add(file)); $("photo-file").files = transfer.files; } catch { /* I file non riusciti restano nella selezione interna. */ }
+      renderPhotoPreview();
+      const firstError = errors[0];
+      $("upload-status").textContent = `${failed.length} ${failed.length === 1 ? "foto non è stata aggiunta" : "foto non sono state aggiunte"}. ${firstError?.message || "Prova con un'altra immagine."}`;
+    } else {
+      $("upload-status").textContent = "";
+      $("add-photo-form").reset(); selectedFiles = []; preparedPhotoCache = new WeakMap(); renderPhotoPreview();
+    }
   } catch (error) {
     console.error(error);
     buildPages();
@@ -431,8 +556,31 @@ function updateCounter() {
 }
 updateCounter(); setInterval(updateCounter,1000);
 $("secret-button").addEventListener("click", () => $("secret-message").classList.toggle("hidden"));
+$("album-clue").addEventListener("click", () => {
+  $("album-clue-heart").classList.add("hidden");
+  $("album-clue-code").classList.remove("hidden");
+  $("album-clue").classList.add("revealed");
+  $("album-clue").setAttribute("aria-expanded", "true");
+  $("album-clue").setAttribute("aria-label", "Indizio dell'album: 26");
+});
+const catMessageText = $("cat-message-text");
+const initialCatMessage = catMessageText.innerHTML;
+let catHintShown = false, catMessageTimer = 0;
+function resetCatHint() {
+  window.clearTimeout(catMessageTimer); catHintShown = false;
+  catMessageText.classList.remove("is-changing"); catMessageText.innerHTML = initialCatMessage;
+}
+function revealCatHint() {
+  catHintShown = true; catMessageText.classList.add("is-changing");
+  window.clearTimeout(catMessageTimer);
+  catMessageTimer = window.setTimeout(() => {
+    catMessageText.innerHTML = 'Ti dò una mano mamma: <strong class="clue-number">05</strong>';
+    requestAnimationFrame(() => catMessageText.classList.remove("is-changing"));
+  }, 150);
+}
 function closeCat() {
   const tail = $("cat-friend"), cat = $("cat-character");
+  resetCatHint();
   $("cat-message")?.classList.remove("cat-touch-visible", "cat-touch-exiting");
   cat?.classList.remove("cat-entering", "cat-exiting"); cat?.classList.add("hidden");
   if (tail?._catReveal) tail.removeEventListener("transitionend", tail._catReveal);
@@ -448,6 +596,7 @@ $("cat-friend").addEventListener("click", () => {
     tail.removeEventListener("transitionend", revealCat);
     tail._catReveal = null;
     if (!tail.classList.contains("tail-leaving")) return;
+    resetCatHint();
     tail.classList.add("hidden"); cat.classList.remove("hidden");
     if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) $("cat-message").classList.add("cat-touch-visible");
     requestAnimationFrame(() => { cat.classList.add("cat-entering"); cat.focus(); });
@@ -457,6 +606,7 @@ $("cat-friend").addEventListener("click", () => {
 $("cat-character").addEventListener("click", () => {
   const tail = $("cat-friend"), cat = $("cat-character");
   if (cat.classList.contains("cat-exiting")) return;
+  if (!catHintShown) { revealCatHint(); return; }
   const touchInteraction = !window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   if (touchInteraction) {
     $("cat-message").classList.remove("cat-touch-visible");
@@ -467,6 +617,7 @@ $("cat-character").addEventListener("click", () => {
     if (event.propertyName !== "transform") return;
     cat.removeEventListener("transitionend", restoreTail);
     cat.classList.remove("cat-exiting"); cat.classList.add("hidden");
+    resetCatHint();
     $("cat-message").classList.remove("cat-touch-visible", "cat-touch-exiting");
     tail.classList.remove("hidden");
     void tail.offsetWidth;
@@ -523,6 +674,6 @@ document.addEventListener("visibilitychange", () => {
 
 // Porta a maiuscola l'iniziale dei testi visibili, inclusi gli aggiornamenti dinamici.
 function capitalizeInitial(value) { return value.replace(/^(\s*)([a-zà-öø-ÿ])/u, (_, space, letter) => space + letter.toLocaleUpperCase("it-IT")); }
-function capitalizeNode(node) { if (node.nodeType === Node.TEXT_NODE) node.nodeValue = capitalizeInitial(node.nodeValue); else if (node.nodeType === Node.ELEMENT_NODE) { for (const attr of ["placeholder", "aria-label", "title"]) if (node.hasAttribute(attr)) node.setAttribute(attr, capitalizeInitial(node.getAttribute(attr))); node.childNodes.forEach(capitalizeNode); } }
+function capitalizeNode(node) { if (node.nodeType === Node.TEXT_NODE) { if (!node.parentElement?.closest("[data-preserve-case]")) node.nodeValue = capitalizeInitial(node.nodeValue); } else if (node.nodeType === Node.ELEMENT_NODE) { if (node.closest("[data-preserve-case]")) return; for (const attr of ["placeholder", "aria-label", "title"]) if (node.hasAttribute(attr)) node.setAttribute(attr, capitalizeInitial(node.getAttribute(attr))); node.childNodes.forEach(capitalizeNode); } }
 document.body.childNodes.forEach(capitalizeNode);
-new MutationObserver(records => records.forEach(record => { if (record.type === "characterData") { const next = capitalizeInitial(record.target.nodeValue); if (next !== record.target.nodeValue) record.target.nodeValue = next; } else record.addedNodes.forEach(capitalizeNode); })).observe(document.body, {subtree:true,childList:true,characterData:true});
+new MutationObserver(records => records.forEach(record => { if (record.type === "characterData") { if (record.target.parentElement?.closest("[data-preserve-case]")) return; const next = capitalizeInitial(record.target.nodeValue); if (next !== record.target.nodeValue) record.target.nodeValue = next; } else record.addedNodes.forEach(capitalizeNode); })).observe(document.body, {subtree:true,childList:true,characterData:true});

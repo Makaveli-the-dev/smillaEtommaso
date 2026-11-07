@@ -3,7 +3,7 @@ import { AlbumAccessError, requireAlbumMember, supabase } from "./supabase-clien
 const BUCKET = "album";
 const SIGNED_URL_SECONDS = 300;
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
-const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_IMAGE_DIMENSION = 2560;
 
 function asAlbumPhoto(row, signedUrl) {
   return {
@@ -59,57 +59,102 @@ export async function refreshAlbumPhotoUrl(photo) {
   return url;
 }
 
-async function optimizeForWeb(file) {
-  if (!ACCEPTED_TYPES.has(file.type)) {
-    throw new Error("Scegli una foto JPEG, PNG o WebP. HEIC non è supportato in questa versione.");
+async function inspectImageFile(file) {
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  const ascii = String.fromCharCode(...header);
+  if (header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) return "jpeg";
+  if (ascii.startsWith("\x89PNG\r\n\x1a\n")) return "png";
+  if (ascii.startsWith("RIFF") && ascii.slice(8, 12) === "WEBP") return "webp";
+  if (ascii.startsWith("GIF87a") || ascii.startsWith("GIF89a")) return "gif";
+  if (ascii.startsWith("BM")) return "bmp";
+  if (ascii.slice(4, 8) === "ftyp") {
+    const brand = ascii.slice(8, 12).toLowerCase();
+    if (["avif", "avis"].includes(brand)) return "avif";
+    if (["heic", "heix", "hevc", "hevx", "heim", "heis", "hevm", "hevs", "mif1", "msf1"].includes(brand)) return "heif";
   }
-  if (file.size > MAX_FILE_BYTES) throw new Error("La foto supera i 12 MB. Scegli una versione più leggera.");
-
-  let bitmap;
-  let width;
-  let height;
-  let draw;
-  if ("createImageBitmap" in window) {
-    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-    width = bitmap.width;
-    height = bitmap.height;
-    draw = (context, targetWidth, targetHeight) => context.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
-  } else {
-    const imageUrl = URL.createObjectURL(file);
-    try {
-      const image = await new Promise((resolve, reject) => {
-        const element = new Image();
-        element.onload = () => resolve(element);
-        element.onerror = reject;
-        element.src = imageUrl;
-      });
-      width = image.naturalWidth;
-      height = image.naturalHeight;
-      draw = (context, targetWidth, targetHeight) => context.drawImage(image, 0, 0, targetWidth, targetHeight);
-    } finally {
-      URL.revokeObjectURL(imageUrl);
-    }
-  }
-
-  const maxDimension = 2560;
-  const scale = Math.min(1, maxDimension / Math.max(width, height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(width * scale));
-  canvas.height = Math.max(1, Math.round(height * scale));
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Questo browser non riesce a preparare la foto per il caricamento.");
-  draw(context, canvas.width, canvas.height);
-  bitmap?.close();
-
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
-  if (!blob || blob.type !== "image/webp") throw new Error("Questo browser non riesce a preparare la foto in WebP.");
-  // La nuova immagine non contiene i metadati EXIF/GPS del file originale.
-  return blob;
+  if (file.type?.startsWith("image/") && file.type !== "image/svg+xml") return "browser-image";
+  throw new Error("Questo file non sembra una fotografia supportata.");
 }
 
-export async function uploadAlbumPhoto(file, takenAt, caption = "") {
+async function decodeInBrowser(file) {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+      return { image: bitmap, release: () => bitmap.close() };
+    } catch { /* Alcuni browser non decodificano HEIF nel percorso nativo. */ }
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error("Decodifica non disponibile."));
+      element.src = url;
+    });
+    return { image, release: () => URL.revokeObjectURL(url) };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
+
+let heifDecoderPromise;
+async function decodeHeifLocally(file) {
+  heifDecoderPromise ||= import("heic-to").then(module => module.heicTo);
+  const heicTo = await heifDecoderPromise;
+  const bitmap = await heicTo({ blob: file, type: "bitmap", options: { imageOrientation: "from-image" } });
+  if (!bitmap || !bitmap.width || !bitmap.height) throw new Error("Decodifica HEIF non riuscita.");
+  return { image: bitmap, release: () => bitmap.close?.() };
+}
+
+async function encodeWebp(canvas, context, draw) {
+  let quality = 0.94;
+  for (;;) {
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/webp", quality));
+    if (!blob || blob.type !== "image/webp") throw new Error("WebP non è supportato da questo browser.");
+    if (blob.size <= MAX_FILE_BYTES) return blob;
+    if (quality > 0.78) { quality = Math.max(0.78, quality - 0.04); continue; }
+    if (Math.max(canvas.width, canvas.height) <= 1280) throw new Error("La foto resta troppo grande anche dopo la preparazione.");
+    canvas.width = Math.max(1, Math.round(canvas.width * 0.85));
+    canvas.height = Math.max(1, Math.round(canvas.height * 0.85));
+    context.imageSmoothingEnabled = true; context.imageSmoothingQuality = "high";
+    draw(context, canvas.width, canvas.height);
+    quality = 0.90;
+  }
+}
+
+export async function prepareAlbumPhoto(file) {
+  let format;
+  try { format = await inspectImageFile(file); } catch { throw new Error("Non siamo riusciti a preparare questa fotografia. Prova con un'altra immagine."); }
+  let decoded;
+  try { decoded = await decodeInBrowser(file); }
+  catch (nativeError) {
+    if (format !== "heif") throw new Error("Non siamo riusciti a preparare questa fotografia. Prova con un'altra immagine.", { cause: nativeError });
+    try { decoded = await decodeHeifLocally(file); }
+    catch (decoderError) { throw new Error("Non siamo riusciti a preparare questa fotografia. Prova con un'altra immagine.", { cause: decoderError }); }
+  }
+
+  const { image } = decoded;
+  const width = image.width || image.naturalWidth, height = image.height || image.naturalHeight;
+  if (!width || !height) { decoded.release(); throw new Error("Non siamo riusciti a preparare questa fotografia. Prova con un'altra immagine."); }
+  const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(width * scale)); canvas.height = Math.max(1, Math.round(height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) { decoded.release(); throw new Error("Non siamo riusciti a preparare questa fotografia. Prova con un'altra immagine."); }
+  context.imageSmoothingEnabled = true; context.imageSmoothingQuality = "high";
+  const draw = (ctx, targetWidth, targetHeight) => ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+  draw(context, canvas.width, canvas.height);
+  try { return await encodeWebp(canvas, context, draw); }
+  catch (error) {
+    if (error.message.includes("troppo grande")) throw error;
+    throw new Error("Non siamo riusciti a preparare questa fotografia. Prova con un'altra immagine.", { cause: error });
+  } finally { decoded.release(); canvas.width = 0; canvas.height = 0; }
+}
+
+export async function uploadAlbumPhoto(file, takenAt, caption = "", preparedImage = null) {
   const session = await requireAlbumMember();
-  const image = await optimizeForWeb(file);
+  const image = preparedImage || await prepareAlbumPhoto(file);
   const path = `${takenAt.slice(0, 7)}/${crypto.randomUUID()}.webp`;
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, image, {
     contentType: "image/webp",

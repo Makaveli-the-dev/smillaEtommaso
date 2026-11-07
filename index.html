@@ -83,7 +83,7 @@
           <div class="form-heading"><div><span class="eyebrow">UN NUOVO RICORDO</span><h3>Aggiungi una pagina</h3></div><button type="button" id="close-add-photo" class="icon-button" aria-label="Chiudi">×</button></div>
           <div class="upload-fields">
             <label>Quando è stata scattata?<input id="photo-date" type="date" required></label>
-            <label>Quali foto vuoi aggiungere?<input id="photo-file" type="file" accept="image/jpeg,image/png,image/webp" multiple required></label>
+            <label>Quali foto vuoi aggiungere?<input id="photo-file" type="file" accept="image/*,.heic,.heif" multiple required></label>
             <label class="wide-field">Un piccolo dettaglio (facoltativo)<input id="photo-caption" type="text" maxlength="90" placeholder="Una frase, un posto, una cosa buffa…"></label>
             <div id="photo-preview" class="photo-preview wide-field" aria-live="polite"></div>
           </div>
@@ -95,7 +95,7 @@
         <div class="album-stage">
           <button id="album-prev" class="page-arrow" aria-label="Pagina precedente">‹</button>
           <article id="album-page" class="album-page" aria-live="polite">
-            <div class="page-topline"><span>SMILLA & TOMMASO</span><span class="page-heart">♡</span></div>
+            <div class="page-topline"><span>SMILLA & TOMMASO</span><button type="button" class="page-heart album-clue" id="album-clue" aria-label="Un piccolo dettaglio nell'album" aria-expanded="false"><span id="album-clue-heart" aria-hidden="true">♡</span><span id="album-clue-code" class="hidden">26</span></button></div>
             <div id="page-content" class="page-content"></div>
             <div class="page-bottomline"><span id="page-date-label">I NOSTRI RICORDI</span><span id="page-number">—</span></div>
           </article>
@@ -108,25 +108,40 @@
       <section id="together-view" class="view hidden">
         <div class="counter-wrap"><p class="eyebrow">VISTO CHE HAI LA MEMORIA CORTA...</p><h2>Da quanto<br>siamo <em>noi?</em></h2>
           <div class="counter-card"><div class="days-number" id="days">0</div><div class="days-label">GIORNI INSIEME</div><div class="time-grid"><div><strong id="hours">00</strong><span>ore</span></div><div><strong id="minutes">00</strong><span>minuti</span></div><div><strong id="seconds">00</strong><span>secondi</span></div></div><p class="counter-footer">And still counting... ♡</p></div>
-          <div class="secret-area"><button id="secret-button" class="text-button">psst… c'è una cosa qui <span>✧</span></button><p id="secret-message" class="secret-message hidden">Hai trovato il mio promemoria: sei la mia persona preferita. ♡</p></div>
+          <div class="secret-area"><button id="secret-button" class="text-button">psst… c'è una cosa qui <span>✧</span></button><p id="secret-message" class="secret-message hidden" aria-live="polite" data-preserve-case>Sei la mia <strong class="clue-number">09</strong> preferita! <span class="clue-heart">♥</span></p></div>
         </div>
       </section>
       <section id="letter-view" class="view hidden">
-        <div class="page-heading"><p class="eyebrow">UN PICCOLO SEGRETO PER TE</p><h2>Una <em>lettera.</em></h2><p>Una busta, un pensiero e un momento tutto tuo.</p></div>
+        <div class="page-heading"><p class="eyebrow">POCHE COSE PARLANO COME LE PAROLE SCRITTE, DUNQUE ECCO A TE:</p><h2>Una <em>lettera.</em></h2><p>Una busta, con i miei pensieri più autentici. ♡</p></div>
         <div id="letter-password-modal" class="letter-password-modal hidden" role="dialog" aria-modal="true" aria-labelledby="letter-password-title">
           <div class="lock-card letter-password-card">
             <button type="button" id="letter-password-close" class="letter-password-close" aria-label="Chiudi">×</button>
             <div class="tiny-orbit" aria-hidden="true">✧</div>
-            <p class="eyebrow">UN PICCOLO SEGRETO PER TE</p>
-            <h1 id="letter-password-title">Una parola per la lettera</h1>
-            <p class="lock-subtitle">Inserisci la parola d'ordine per leggere il mio pensiero.</p>
+            <p class="eyebrow">HAH, PENSAVI SAREBBE STATO FACILE, EH...</p>
+            <h1 id="letter-password-title">Trova la parola d'ordine</h1>
+            <p class="lock-subtitle">Risolvi l'enigma per leggere il mio pensiero.</p>
             <form id="letter-password-form" class="auth-form letter-password-form">
-              <label for="letter-password-input">La parola d'ordine</label>
-              <input id="letter-password-input" type="password" autocomplete="off" required>
+              <label for="letter-password-input">Ecco a te il quesito:</label>
+              <input id="letter-password-input" placeholder="In che paese ci siamo visti la prima volta?" type="password" autocomplete="off" required>
               <button class="primary-button" type="submit">Apri la lettera <span>♡</span></button>
               <p id="letter-password-message" class="form-message" role="status" aria-live="polite"></p>
             </form>
           </div>
+        </div>
+        <div id="coupon-modal" class="letter-coupon-modal hidden" role="dialog" aria-modal="true" aria-labelledby="coupon-title">
+          <section class="coupon-card">
+            <button type="button" id="coupon-close" class="letter-password-close" aria-label="Chiudi">×</button>
+            <div class="tiny-orbit" aria-hidden="true">✧</div>
+            <p class="eyebrow">INDIZIO COMPLETATO</p>
+            <h2 id="coupon-title">Complimenti, Smilla!</h2>
+            <p class="coupon-intro">Hai trovato il codice segreto e conquistato un coupon speciale.</p>
+            <div class="coupon-ticket">
+              <img id="coupon-image" class="coupon-image hidden" alt="Coupon per una richiesta che Tommaso non può rifiutare">
+              <div id="coupon-image-placeholder" class="coupon-image-placeholder">Il coupon illustrato arriverà qui presto.<small>Il download si attiverà quando aggiungerai il file.</small></div>
+            </div>
+            <button type="button" class="primary-button" id="coupon-download" disabled>Custodisci il coupon ♡</button>
+            <p id="coupon-download-status" class="coupon-download-status" role="status" aria-live="polite"></p>
+          </section>
         </div>
         <div class="letter-scene" id="letter-scene">
           <button type="button" class="letter-envelope" id="letter-toggle" aria-expanded="false" aria-controls="letter-paper" aria-label="Apri la lettera">
@@ -149,6 +164,19 @@
               <p class="letter-date">5 novembre 2026</p>
             </div>
           </article>
+          <div class="letter-keypad" id="letter-keypad" role="group" aria-label="Tastierino per il codice del coupon">
+            <p class="keypad-prompt">Il codice è nascosto da qualche parte tra queste pagine… riesci a trovarlo?</p>
+            <div class="keypad-indicator" id="keypad-indicator" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+            <p class="sr-only" id="keypad-status" aria-live="polite">Nessuna cifra inserita.</p>
+            <div class="keypad-keys" id="keypad-keys">
+              <button type="button" data-code-digit="1">1</button><button type="button" data-code-digit="2">2</button><button type="button" data-code-digit="3">3</button>
+              <button type="button" data-code-digit="4">4</button><button type="button" data-code-digit="5">5</button><button type="button" data-code-digit="6">6</button>
+              <button type="button" data-code-digit="7">7</button><button type="button" data-code-digit="8">8</button><button type="button" data-code-digit="9">9</button>
+              <button type="button" data-code-action="backspace" aria-label="Cancella l'ultima cifra">⌫</button><button type="button" data-code-digit="0">0</button><button type="button" data-code-action="clear" aria-label="Cancella tutto">C</button>
+            </div>
+            <button type="button" class="keypad-confirm" id="keypad-confirm" disabled>Scopri la sorpresa ♡</button>
+            <p class="keypad-message" id="keypad-message" role="status" aria-live="polite"></p>
+          </div>
         </div>
       </section>
       <footer class="footer"><span>Fatto con amore (e un po' di AI)</span><span>Smilla <b>♡</b> Tommaso</span><span>© 2026</span></footer>
@@ -156,7 +184,7 @@
   </main>
   <button class="cat-friend hidden" id="cat-friend" aria-label="Fai uscire Macchia" title="Fai uscire Macchia"><img src="assets/coda-di-macchia.png?v=20261105-3" alt="Coda di Macchia"></button>
   <button type="button" id="cat-character" class="cat-character hidden" aria-label="Chiudi Macchia"><img src="assets/macchia-cartoon.png?v=20261105-3" alt="Macchia si affaccia con le zampe sul bordo dello schermo"></button>
-  <button type="button" id="cat-message" class="cat-message" aria-label="Chiudi Macchia">Sono Macchia! Tommaso è il miglior fidanzato di sempre Smilla, sei troppo fortunata!!  ♡</button>
+  <button type="button" id="cat-message" class="cat-message" aria-label="Chiudi Macchia"><span id="cat-message-text" aria-live="polite" data-preserve-case>Sono Macchia! Tommaso è il miglior fidanzato di sempre Smilla, sei troppo fortunata!!  ♡</span></button>
   <div id="lightbox" class="lightbox hidden" role="dialog" aria-modal="true" aria-label="Fotografia ingrandita"><button id="lightbox-close" class="lightbox-close" aria-label="Chiudi">×</button><button id="lightbox-prev" class="lightbox-arrow" aria-label="Foto precedente">‹</button><figure><img id="lightbox-image" src="" alt=""><figcaption id="lightbox-caption"></figcaption></figure><button id="lightbox-next" class="lightbox-arrow" aria-label="Foto successiva">›</button></div>
   <audio id="background-music" loop></audio>
   <script type="module" src="/script.js"></script>
